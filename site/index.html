@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr" data-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -185,7 +185,11 @@ footer { padding: 36px 0; font-size: 12.5px; color: var(--text-muted); display: 
           <h1>AI-ready interfaces<br /><span class="accent">&amp; semantic WebMCP.</span></h1>
         </div>
         <div>
-          <p class="lead">Inspiré de ui-sdk.dev : rend vos formulaires (Lux.Form), tableaux de bord (Lux.Dashboard) et imports (Lux.Spreadsheet) directement pilotables par des agents IA sans sélecteurs CSS fragiles. Expose Snapshot/Query/Act sémantique, politique d&#x27;autorisation, redaction [redacted] des secrets, WebMCP et UndoStack&lt;T&gt;.</p>
+          <p class="lead">Inspired by ui-sdk.dev: makes Lux.Form, Lux.Dashboard, and Lux.Spreadsheet immediately inspectable and operable by AI agents without brittle CSS selectors. Provides semantic Snapshot/Query/Act, global permission policies, automatic [redacted] secret masking, WebMCP browser assets, and UndoStack&lt;T&gt;.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+            <a class="btn btn-accent" href="../docs/getting-started.md">Read Documentation →</a>
+            <a class="btn" href="../docs/api-reference.md">API Reference</a>
+          </div>
           <div class="install-stack">
             <button class="cmd mono" type="button" onclick="copyCmd(this,'dotnet add package Lux.Agent')">
               <span>$ dotnet add package <strong>Lux.Agent</strong> <span class="comment"># Blazor + MAUI Hybrid</span></span>
@@ -196,7 +200,7 @@ footer { padding: 36px 0; font-size: 12.5px; color: var(--text-muted); display: 
               <span class="copy-tag">Copy</span>
             </button>
           </div>
-          <div class="platforms"><span class="plat mono">Headless C# / NativeAOT</span><span class="plat mono">Blazor Web &amp; MAUI Hybrid</span><span class="plat mono">Browser WebMCP (navigator.modelContext)</span><span class="plat mono">Privacy-First Redaction</span></div>
+          <div class="platforms"><span class="plat mono">Headless C# / NativeAOT</span><span class="plat mono">Blazor Server / WASM / Auto</span><span class="plat mono">.NET MAUI Blazor Hybrid</span><span class="plat mono">Browser WebMCP (navigator.modelContext)</span></div>
         </div>
       </div>
 
@@ -234,7 +238,7 @@ footer { padding: 36px 0; font-size: 12.5px; color: var(--text-muted); display: 
     <div class="wrap">
       <div class="eyebrow mono">Why Lux.Agent</div>
       <h2>Headless C# engine.<br /><span style="color:var(--accent)">Production-ready UI.</span></h2>
-      <div class="grid-4"><article class="card"><span class="tag mono">Semantic Bridge</span><h3>Snapshot, Query &amp; Act sémantique</h3><p>Expose jusqu&#x27;à 100 contrôles par ref stable (c1, c2…), choix interrogeables sans ouvrir de popup et actions sémantiques (setValue, toggle, submit).</p></article><article class="card"><span class="tag mono">Policy Guard</span><h3>Porte de permission &amp; Confirmation</h3><p>AllowPolicy global ou par appel avec indicateur ConfirmRequired pour bloquer ou valider les actions sensibles avant exécution.</p></article><article class="card"><span class="tag mono">Privacy First</span><h3>Flux Observe &amp; Masquage [redacted]</h3><p>Flux unifié ObservedChange (source Agent/User) où les champs Password/OneTimeCode sont systématiquement remplacés par [redacted].</p></article><article class="card"><span class="tag mono">WebMCP + Undo</span><h3>Assets JS WebMCP &amp; UndoStack&lt;T&gt;</h3><p>Expose _content/Lux.Agent/lux-agent.js + lux-behaviors.js pour WebMCP et UndoStack&lt;T&gt; borné dans Lux.Agent.Core (NativeAOT).</p></article></div>
+      <div class="grid-4"><article class="card"><span class="tag mono">Semantic Bridge</span><h3>Semantic Snapshot, Query &amp; Act</h3><p>Exposes up to 100 controls by stable ref (c1, c2…), queries select/filter choices without opening popups, and runs semantic actions (setValue, toggle, submit).</p></article><article class="card"><span class="tag mono">Policy Guard</span><h3>Permission Gate &amp; Confirmation Policy</h3><p>Global AllowPolicy or per-call gate with ConfirmRequired flags to approve or block consequential actions before execution.</p></article><article class="card"><span class="tag mono">Privacy First</span><h3>Observe Stream &amp; Secret Redaction</h3><p>Unified ObservedChange stream (Agent/User source) where Password and OneTimeCode fields are always redacted as [redacted].</p></article><article class="card"><span class="tag mono">WebMCP + Undo</span><h3>WebMCP JS Assets &amp; UndoStack&lt;T&gt;</h3><p>Ships _content/Lux.Agent/lux-agent.js + lux-behaviors.js for WebMCP and a bounded generic UndoStack&lt;T&gt; in Lux.Agent.Core (NativeAOT).</p></article></div>
     </div>
   </section>
 
@@ -250,10 +254,10 @@ footer { padding: 36px 0; font-size: 12.5px; color: var(--text-muted); display: 
 agent.RegisterForm(form, confirmSubmit: true);
 agent.RegisterDashboard(dashboard);
 
-// Interroge les options sans ouvrir aucun popup (insensible aux accents)
+// Inspect choices accent-insensitively without opening any popup
 var choices = agent.Query(new AgentQueryRequest { Within = &quot;region&quot;, Text = &quot;Europe&quot; });
 
-// Exécute des actions sémantiques avec garde de permission &amp; redaction
+// Execute semantic steps with policy checks &amp; automatic secret redaction
 var result = await agent.ActAsync([
     new AgentActStep(&quot;project name&quot;, &quot;setValue&quot;, [&quot;Atlas&quot;]),
     new AgentActStep(&quot;region&quot;, &quot;setValue&quot;, [&quot;eu-west&quot;])
@@ -261,13 +265,13 @@ var result = await agent.ActAsync([
         </div>
         <div class="code-panel">
           <div class="code-head mono"><span>wwwroot/lux-agent.js · Browser WebMCP Bridge</span><span class="layer-ui">UI · Blazor &amp; MAUI</span></div>
-          <pre><code>// Servi automatiquement via _content/Lux.Agent/lux-agent.js
+          <pre><code>// Served automatically via _content/Lux.Agent/lux-agent.js
 const snap = window.Blux.agent.snapshot();
 const res  = await window.Blux.agent.act([
   { ref: &#x27;Project name&#x27;, action: &#x27;setValue&#x27;, args: [&#x27;Atlas&#x27;] }
 ]);
 
-// Flux d&#x27;observation unifié (mots de passe masqués en &quot;[redacted]&quot;)
+// Privacy-preserving observation stream (passwords auto-masked as &quot;[redacted]&quot;)
 const stop = window.Blux.agent.observe(evt =&gt; console.log(evt));</code></pre>
         </div>
       </div>
@@ -276,12 +280,27 @@ const stop = window.Blux.agent.observe(evt =&gt; console.log(evt));</code></pre>
 
   <section class="band">
     <div class="wrap">
-      <div class="eyebrow mono">Package Exports &amp; Components</div>
+      <div class="eyebrow mono">Exhaustive Documentation</div>
+      <h2>Guides, Architecture &amp; API Reference</h2>
+      <div class="grid-4" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+            <a class="card" href="../docs/getting-started.md"><span class="tag mono">GUIDE</span><h3>Getting Started</h3><p>Package installation, DI setup, namespace imports, and your first example.</p></a>
+            <a class="card" href="../docs/architecture.md"><span class="tag mono">CORE + UI</span><h3>Architecture</h3><p>Strict two-layer headless NativeAOT Core vs Blazor &amp; MAUI Hybrid UI split.</p></a>
+            <a class="card" href="../docs/api-reference.md"><span class="tag mono">EXHAUSTIVE API</span><h3>Complete API Reference</h3><p>Every public class, enum, property, method, and Razor parameter extracted from source.</p></a>
+            <a class="card" href="../docs/maui-and-aot.md"><span class="tag mono">MULTIPLATFORM</span><h3>.NET MAUI &amp; NativeAOT</h3><p>Setup for iOS, Android, macOS Catalyst, Windows, and NativeAOT builds.</p></a>
+            <a class="card" href="../docs/recipes.md"><span class="tag mono">RECIPES</span><h3>Recipes &amp; Testing</h3><p>Production patterns and xUnit / bUnit testing examples.</p></a>
+            <a class="card" href="http://localhost:5180/docs/lux-agent"><span class="tag mono">PLAYGROUND</span><h3>Interactive Playground Docs</h3><p>Live documentation page with interactive examples and XML-backed API tables.</p></a>
+            </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="eyebrow mono">Package Exports</div>
       <h2>Included in Lux.Agent</h2>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Export</th><th>Layer</th><th>NuGet Package</th><th>Description</th></tr></thead>
-          <tbody><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentComponentSnapshot</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">Modèle NativeAOT compact : état, actions et indicateurs de confirmation.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">UndoStack&lt;T&gt;</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">Pile Undo/Redo générique bornée avec libellés et événements.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentBridgeService</td><td><span class="mono layer-ui">UI</span></td><td class="mono">Lux.Agent</td><td style="color:var(--text-muted)">Relie FormController, DashboardController et SpreadsheetImporter aux agents IA.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">lux-agent.js &amp; lux-behaviors.js</td><td><span class="mono layer-ui">UI</span></td><td class="mono">Lux.Agent</td><td style="color:var(--text-muted)">Assets statiques WebMCP (navigator.modelContext) et behaviors DOM.</td></tr></tbody>
+          <tbody><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentChangeSource</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">Source of a component state change reported to `AgentBridgeService.Observe`.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">ObservedChange</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">A single notification emitted by the unified `observe` change stream.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentComponentSnapshot</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">Snapshot entry describing one component on the page and the actions it currently supports.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentChoiceItem</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">One choice item returned by `AgentBridgeService.Query` for a select, filter, or list component.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentQueryMatch</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">Result entry returned by `AgentBridgeService.Query`.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentQueryRequest</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">Query parameters for `AgentBridgeService.Query`.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentActStep</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">One action step in an `AgentBridgeService.ActAsync` call.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentActStepOutcome</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">Outcome of a single step in `AgentActResult`.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentActResult</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">Result of an `AgentBridgeService.ActAsync` invocation.</td></tr><tr><td class="mono" style="font-weight:600;color:var(--text-strong)">AgentToolDefinition</td><td><span class="mono layer-core">Core</span></td><td class="mono">Lux.Agent.Core</td><td style="color:var(--text-muted)">Tool metadata and hints following the `ui-sdk.dev` Agent / WebMCP specification.</td></tr></tbody>
         </table>
       </div>
     </div>
