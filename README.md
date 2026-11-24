@@ -63,13 +63,13 @@ var result = await agent.ActAsync([
 
 ```razor
 // Served automatically via _content/Lux.Agent/lux-agent.js
-const snap = window.Blux.agent.snapshot();
-const res  = await window.Blux.agent.act([
+const snap = window.Lux.agent.snapshot();
+const res  = await window.Lux.agent.act([
   { ref: 'Project name', action: 'setValue', args: ['Atlas'] }
 ]);
 
 // Privacy-preserving observation stream (passwords auto-masked as "[redacted]")
-const stop = window.Blux.agent.observe(evt => console.log(evt));
+const stop = window.Lux.agent.observe(evt => console.log(evt));
 ```
 
 ## Documentation
