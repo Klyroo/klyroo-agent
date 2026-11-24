@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>Blux.UI.Tools</RootNamespace>
+    <RootNamespace>Lux.Agent</RootNamespace>
     <PackageId>Lux.Agent</PackageId>
     <Description>LuxStack Semantic Agent Bridge for Blazor Web &amp; .NET MAUI Hybrid: connects Lux.Form, Lux.Dashboard, and Lux.Spreadsheet to AI agents, WebMCP, and composable browser behaviors.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -21,5 +21,10 @@
     <SupportedPlatform Include="android" />
     <SupportedPlatform Include="maccatalyst" />
     <SupportedPlatform Include="windows" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Lux.Form" />
+    <Using Include="Lux.Dashboard" />
+    <Using Include="Lux.Spreadsheet" />
   </ItemGroup>
 </Project>

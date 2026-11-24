@@ -9,4 +9,9 @@
     <ProjectReference Include="..\..\src\Lux.Agent.Core\Lux.Agent.Core.csproj" />
     <ProjectReference Include="..\..\src\Lux.Agent\Lux.Agent.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Using Include="Lux.Form" />
+    <Using Include="Lux.Dashboard" />
+    <Using Include="Lux.Spreadsheet" />
+  </ItemGroup>
 </Project>

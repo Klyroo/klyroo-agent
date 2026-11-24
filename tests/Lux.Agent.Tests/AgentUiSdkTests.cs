@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Blux.UI.Tools.Tests;
+namespace Lux.Agent.Tests;
 
 public sealed class AgentUiSdkTests
 {

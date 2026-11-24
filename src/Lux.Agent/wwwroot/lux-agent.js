@@ -1,4 +1,4 @@
-// Semantic Agent Runtime (snapshot, query, act), Unified Observe Stream, and WebMCP integration for Blux.UI.
+// Semantic Agent Runtime (snapshot, query, act), Unified Observe Stream, and WebMCP integration for Lux.UI.
 // Inspired by ui-sdk.dev (@ui-sdk/core/agent and @ui-sdk/core/observe).
 
 const observers = new Set();
@@ -392,7 +392,7 @@ export function createAgent({ allow = null } = {}) {
 export const agentTools = [
   {
     name: 'snapshot',
-    description: 'Lists the Blux UI components on the page, their current state, and the actions they support.',
+    description: 'Lists the Lux.UI components on the page, their current state, and the actions they support.',
     annotations: { readOnlyHint: true, untrustedContentHint: true },
     inputSchema: {
       type: 'object',

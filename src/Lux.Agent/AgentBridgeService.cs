@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace Blux.UI.Tools;
+namespace Lux.Agent;
 
 /// <summary>
 /// Semantic Agent Bridge inspired by <c>ui-sdk.dev</c> (<c>createAgent</c>, <c>snapshot</c>, <c>query</c>, <c>act</c>, <c>observe</c>).

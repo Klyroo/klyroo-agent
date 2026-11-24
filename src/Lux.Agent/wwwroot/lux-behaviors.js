@@ -1,4 +1,4 @@
-// Composable headless UI behaviors inspired by ui-sdk.dev (@ui-sdk/core) for Blux.UI.
+// Composable headless UI behaviors inspired by ui-sdk.dev (@ui-sdk/core) for Lux.UI.
 import { FOCUSABLE, ensureId, float, rovingKey } from './shared.js';
 
 let liveRegionPolite = null;

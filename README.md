@@ -41,7 +41,10 @@ builder.Services.AddLuxAgent();
 ### Headless Core (`Lux.Agent.Core`)
 
 ```csharp
-using Blux.UI.Tools;
+using Lux.Agent;
+using Lux.Form;
+using Lux.Dashboard;
+using Lux.Spreadsheet;
 
 agent.RegisterForm(form, confirmSubmit: true);
 agent.RegisterDashboard(dashboard);

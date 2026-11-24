@@ -27,8 +27,11 @@ builder.Services.AddLuxAgent();
 In `_Imports.razor`:
 
 ```razor
-@using Blux.UI
-@using Blux.UI.Tools
+@using Lux.UI
+@using Lux.Agent
+@using Lux.Form
+@using Lux.Dashboard
+@using Lux.Spreadsheet
 
 ```
 
@@ -37,7 +40,10 @@ In `_Imports.razor`:
 ### Headless C# (`Lux.Agent.Core`)
 
 ```csharp
-using Blux.UI.Tools;
+using Lux.Agent;
+using Lux.Form;
+using Lux.Dashboard;
+using Lux.Spreadsheet;
 
 agent.RegisterForm(form, confirmSubmit: true);
 agent.RegisterDashboard(dashboard);
