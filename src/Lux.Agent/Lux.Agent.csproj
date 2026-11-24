@@ -1,9 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Blux.UI.Tools</RootNamespace>
     <PackageId>Lux.Agent</PackageId>
-    <Description>LuxStack Semantic Agent Bridge connecting Lux.Form, Lux.Dashboard, and Lux.Spreadsheet to AI agents and WebMCP.</Description>
+    <Description>LuxStack Semantic Agent Bridge for Blazor Web &amp; .NET MAUI Hybrid: connects Lux.Form, Lux.Dashboard, and Lux.Spreadsheet to AI agents, WebMCP, and composable browser behaviors.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <IsTrimmable>true</IsTrimmable>
@@ -14,5 +14,12 @@
     <ProjectReference Include="..\..\..\lux-form\src\Lux.Form.Core\Lux.Form.Core.csproj" />
     <ProjectReference Include="..\..\..\lux-dashboard\src\Lux.Dashboard.Core\Lux.Dashboard.Core.csproj" />
     <ProjectReference Include="..\..\..\lux-spreadsheet\src\Lux.Spreadsheet.Core\Lux.Spreadsheet.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+    <SupportedPlatform Include="ios" />
+    <SupportedPlatform Include="android" />
+    <SupportedPlatform Include="maccatalyst" />
+    <SupportedPlatform Include="windows" />
   </ItemGroup>
 </Project>
