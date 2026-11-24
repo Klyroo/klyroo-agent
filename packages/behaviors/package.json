@@ -1,0 +1,7 @@
+{
+  "name": "@lux/behaviors",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./index.js",
+  "description": "LuxStack composable headless UI behaviors (focus, selection, popups, reorder, resize, viewport, inline-edit, undo) inspired by ui-sdk.dev."
+}

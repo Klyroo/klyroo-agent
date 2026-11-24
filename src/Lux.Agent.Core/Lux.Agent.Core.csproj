@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Blux.UI.Tools</RootNamespace>
+    <PackageId>Lux.Agent.Core</PackageId>
+    <Description>LuxStack Agent Core: Headless semantic UI agent models (snapshot, query, act, observe, UndoStack) inspired by ui-sdk.dev. Zero dependencies, NativeAOT compatible.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+</Project>

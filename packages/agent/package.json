@@ -1,0 +1,7 @@
+{
+  "name": "@lux/agent",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./index.js",
+  "description": "LuxStack Semantic UI Agent runtime (snapshot, query, act, observe, WebMCP)."
+}

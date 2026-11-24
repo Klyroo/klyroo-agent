@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Blux.UI.Tools</RootNamespace>
+    <PackageId>Lux.Agent</PackageId>
+    <Description>LuxStack Semantic Agent Bridge connecting Lux.Form, Lux.Dashboard, and Lux.Spreadsheet to AI agents and WebMCP.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <ProjectReference Include="..\Lux.Agent.Core\Lux.Agent.Core.csproj" />
+    <ProjectReference Include="..\..\..\lux-form\src\Lux.Form.Core\Lux.Form.Core.csproj" />
+    <ProjectReference Include="..\..\..\lux-dashboard\src\Lux.Dashboard.Core\Lux.Dashboard.Core.csproj" />
+    <ProjectReference Include="..\..\..\lux-spreadsheet\src\Lux.Spreadsheet.Core\Lux.Spreadsheet.Core.csproj" />
+  </ItemGroup>
+</Project>

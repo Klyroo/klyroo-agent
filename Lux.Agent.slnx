@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Lux.Agent.Core/Lux.Agent.Core.csproj" />
+    <Project Path="src/Lux.Agent/Lux.Agent.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Lux.Agent.Tests/Lux.Agent.Tests.csproj" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/HeadlessAgentExample/HeadlessAgentExample.csproj" />
+  </Folder>
+</Solution>
