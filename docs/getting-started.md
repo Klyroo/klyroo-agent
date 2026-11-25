@@ -1,25 +1,25 @@
-# Getting Started with Lux.Agent
+# Getting Started with Klyroo.Agent
 
-Inspired by ui-sdk.dev: makes Lux.Form, Lux.Dashboard, and Lux.Spreadsheet immediately inspectable and operable by AI agents without brittle CSS selectors. Provides semantic Snapshot/Query/Act, global permission policies, automatic [redacted] secret masking, WebMCP browser assets, and UndoStack<T>.
+Inspired by ui-sdk.dev: makes Klyroo.Form, Klyroo.Dashboard, and Klyroo.Spreadsheet immediately inspectable and operable by AI agents without brittle CSS selectors. Provides semantic Snapshot/Query/Act, global permission policies, automatic [redacted] secret masking, WebMCP browser assets, and UndoStack<T>.
 
 ## 1. Choose Your Package
 
 | Use Case | Package to Install |
 | :--- | :--- |
-| Headless C#, Minimal APIs, Workers, CLI, or native C# .NET MAUI ViewModels | `Lux.Agent.Core` |
-| Blazor Web App (Server, WebAssembly, Auto, Static SSR) or `.NET MAUI Blazor Hybrid` | `Lux.Agent` |
+| Headless C#, Minimal APIs, Workers, CLI, or native C# .NET MAUI ViewModels | `Klyroo.Agent.Core` |
+| Blazor Web App (Server, WebAssembly, Auto, Static SSR) or `.NET MAUI Blazor Hybrid` | `Klyroo.Agent` |
 
 ```bash
-dotnet add package Lux.Agent.Core
-dotnet add package Lux.Agent
+dotnet add package Klyroo.Agent.Core
+dotnet add package Klyroo.Agent
 ```
 
 ## 2. Register Services
 
-Call `builder.Services.AddLuxAgent();` in `Program.cs` (both Server and Client projects when using Blazor Interactive Auto) or `MauiProgram.cs` (after `AddMauiBlazorWebView()`):
+Call `builder.Services.AddKlyrooAgent();` in `Program.cs` (both Server and Client projects when using Blazor Interactive Auto) or `MauiProgram.cs` (after `AddMauiBlazorWebView()`):
 
 ```csharp
-builder.Services.AddLuxAgent();
+builder.Services.AddKlyrooAgent();
 ```
 
 ## 3. Add Namespace Imports
@@ -27,23 +27,23 @@ builder.Services.AddLuxAgent();
 In `_Imports.razor`:
 
 ```razor
-@using Lux.UI
-@using Lux.Agent
-@using Lux.Form
-@using Lux.Dashboard
-@using Lux.Spreadsheet
+@using Klyroo.UI
+@using Klyroo.Agent
+@using Klyroo.Form
+@using Klyroo.Dashboard
+@using Klyroo.Spreadsheet
 
 ```
 
 ## 4. First Example
 
-### Headless C# (`Lux.Agent.Core`)
+### Headless C# (`Klyroo.Agent.Core`)
 
 ```csharp
-using Lux.Agent;
-using Lux.Form;
-using Lux.Dashboard;
-using Lux.Spreadsheet;
+using Klyroo.Agent;
+using Klyroo.Form;
+using Klyroo.Dashboard;
+using Klyroo.Spreadsheet;
 
 agent.RegisterForm(form, confirmSubmit: true);
 agent.RegisterDashboard(dashboard);
@@ -58,17 +58,17 @@ var result = await agent.ActAsync([
 ]);
 ```
 
-### Blazor / MAUI Hybrid (`Lux.Agent`)
+### Blazor / MAUI Hybrid (`Klyroo.Agent`)
 
 ```razor
-// Served automatically via _content/Lux.Agent/lux-agent.js
-const snap = window.Lux.agent.snapshot();
-const res  = await window.Lux.agent.act([
+// Served automatically via _content/Klyroo.Agent/klyroo-agent.js
+const snap = window.Klyroo.agent.snapshot();
+const res  = await window.Klyroo.agent.act([
   { ref: 'Project name', action: 'setValue', args: ['Atlas'] }
 ]);
 
 // Privacy-preserving observation stream (passwords auto-masked as "[redacted]")
-const stop = window.Lux.agent.observe(evt => console.log(evt));
+const stop = window.Klyroo.agent.observe(evt => console.log(evt));
 ```
 
 ## Next Steps

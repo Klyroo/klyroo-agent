@@ -1,4 +1,4 @@
-// Composable headless UI behaviors inspired by ui-sdk.dev (@ui-sdk/core) for Lux.UI.
+// Composable headless UI behaviors inspired by ui-sdk.dev (@ui-sdk/core) for Klyroo.UI.
 import { FOCUSABLE, ensureId, float, rovingKey } from './shared.js';
 
 let liveRegionPolite = null;
@@ -345,7 +345,7 @@ export function createInlineEdit(context, { key = 'value', onCommit = null, onCa
 }
 
 /**
- * Defines a composable primitive that wires state, live DOM updates, behaviors, slots, and the Lux.agent bridge.
+ * Defines a composable primitive that wires state, live DOM updates, behaviors, slots, and the Klyroo.agent bridge.
  */
 export function definePrimitive(definition) {
   const { name, state: createInitialState, api: createApi, slots: createSlots, agent: agentConfig } = definition;
@@ -393,15 +393,15 @@ export function definePrimitive(definition) {
       };
 
       if (rootElement) {
-        rootElement.__lxPrimitive = instance;
-        rootElement.setAttribute('data-lx-primitive', name);
+        rootElement.__klyPrimitive = instance;
+        rootElement.setAttribute('data-kly-primitive', name);
       }
       return instance;
     },
   };
 }
 
-export const LuxBehaviors = {
+export const KlyrooBehaviors = {
   announce,
   createUndoStack,
   createRovingFocus,

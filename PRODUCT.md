@@ -13,37 +13,37 @@ web
 
 ## Product Purpose
 
-`lux-agent` provides a headless NativeAOT semantic UI bridge (`Lux.Agent.Core`) and Blazor/WebMCP integration (`Lux.Agent`) that lets AI agents inspect, query, observe, and safely operate `Lux.Form`, `Lux.Dashboard`, and `Lux.Spreadsheet` controls without brittle CSS selectors or DOM scraping.
+`klyroo-agent` provides a headless NativeAOT semantic UI bridge (`Klyroo.Agent.Core`) and Blazor/WebMCP integration (`Klyroo.Agent`) that lets AI agents inspect, query, observe, and safely operate `Klyroo.Form`, `Klyroo.Dashboard`, and `Klyroo.Spreadsheet` controls without brittle CSS selectors or DOM scraping.
 
 Success means an application registers its existing controllers once (`RegisterForm`, `RegisterDashboard`, `RegisterSpreadsheet`) and immediately gains stable semantic refs (`c1`, `c2`…), choice querying, a unified `Observe` audit stream, automatic `[redacted]` masking of secrets, `UndoStack<T>` rollback, and an `AllowPolicy` confirmation gate for consequential actions.
 
 ## Positioning
 
-Unlike browser-automation wrappers that guess fragile CSS selectors or expose raw DOM secrets to LLMs, `Lux.Agent` binds directly to strongly typed C# domain controllers (`FormController`, `DashboardController`, `SpreadsheetImporter`), guarantees `[redacted]` secret masking by design, enforces human-in-the-loop `AllowPolicy` confirmation gates, and works identically in headless NativeAOT C# and Blazor/WebMCP browsers under MIT.
+Unlike browser-automation wrappers that guess fragile CSS selectors or expose raw DOM secrets to LLMs, `Klyroo.Agent` binds directly to strongly typed C# domain controllers (`FormController`, `DashboardController`, `SpreadsheetImporter`), guarantees `[redacted]` secret masking by design, enforces human-in-the-loop `AllowPolicy` confirmation gates, and works identically in headless NativeAOT C# and Blazor/WebMCP browsers under MIT.
 
 ## Operating Context
 
-- **Packages**: `Lux.Agent.Core` (`AgentActStep`, `AgentChoiceItem`, `ObservedChange`, `UndoStack<T>`, semantic contracts) and `Lux.Agent` (`AgentBridgeService`, WebMCP browser assets `lux-agent.js` / `lux-behaviors.js`).
-- **Integration**: Connects directly to `Lux.Form`, `Lux.Dashboard`, and `Lux.Spreadsheet`.
-- **Showcase**: Powers the live `Lux.Agent Copilot` sidebar in `Lux.Stack.Site` `/showcase` with `Snapshot`, `Act`, `Observe` audit log, `[redacted]` webhook secret proof, `UndoStack<T>`, and the `AllowPolicy` human approval modal.
+- **Packages**: `Klyroo.Agent.Core` (`AgentActStep`, `AgentChoiceItem`, `ObservedChange`, `UndoStack<T>`, semantic contracts) and `Klyroo.Agent` (`AgentBridgeService`, WebMCP browser assets `klyroo-agent.js` / `klyroo-behaviors.js`).
+- **Integration**: Connects directly to `Klyroo.Form`, `Klyroo.Dashboard`, and `Klyroo.Spreadsheet`.
+- **Showcase**: Powers the live `Klyroo.Agent Copilot` sidebar in `Klyroo.Stack.Site` `/showcase` with `Snapshot`, `Act`, `Observe` audit log, `[redacted]` webhook secret proof, `UndoStack<T>`, and the `AllowPolicy` human approval modal.
 
 ## Capabilities and Constraints
 
-- `Lux.Agent.Core` is 100% headless with `<IsAotCompatible>true</IsAotCompatible>` and `<IsTrimmable>true</IsTrimmable>`.
+- `Klyroo.Agent.Core` is 100% headless with `<IsAotCompatible>true</IsAotCompatible>` and `<IsTrimmable>true</IsTrimmable>`.
 - Exposes up to 100 registered controls per bridge by stable semantic ref (`c1`, `c2`…) and disambiguated label.
 - `Password` and `OneTimeCode` fields must always serialize as `[redacted]` in `Snapshot()` and `Observe()` — never raw values.
 - Consequential actions (`confirmSubmit: true` or custom `AllowPolicy`) must pause cleanly for explicit user approval and resolve safely on refusal or dialog dismissal without hanging tasks.
-- 100% MIT open-source license; strict `Lux.Agent*` / `lux-agent.js` naming.
+- 100% MIT open-source license; strict `Klyroo.Agent*` / `klyroo-agent.js` naming.
 
 ## Brand Commitments
 
-- **Name**: `Lux.Agent` (`lux-agent`), part of the **LuxStack** ecosystem.
+- **Name**: `Klyroo.Agent` (`klyroo-agent`), part of the **Klyroo** ecosystem.
 - **Voice**: Trustworthy, transparent, and safety-first around AI-initiated mutations.
 
 ## Evidence on Hand
 
-- Passing unit tests (`tests/Lux.Agent.Tests`) covering Snapshot, Query, Act, `AllowPolicy`, `[redacted]` secret masking, `Observe`, and `UndoStack<T>`, plus NativeAOT publish verification in CI.
-- Live interactive Copilot sidebar with `AllowPolicy` approval modal and real-time `Observe` audit log in `Lux.Stack.Site` `/showcase` and product docs at `/agent`.
+- Passing unit tests (`tests/Klyroo.Agent.Tests`) covering Snapshot, Query, Act, `AllowPolicy`, `[redacted]` secret masking, `Observe`, and `UndoStack<T>`, plus NativeAOT publish verification in CI.
+- Live interactive Copilot sidebar with `AllowPolicy` approval modal and real-time `Observe` audit log in `Klyroo.Stack.Site` `/showcase` and product docs at `/agent`.
 - **Explicit absences (do not fabricate)**: No NuGet download stats, customer logos, or third-party testimonials exist yet.
 
 ## Product Principles

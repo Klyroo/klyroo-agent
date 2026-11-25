@@ -1,10 +1,10 @@
-using Lux.Agent;
-using Lux.Dashboard;
-using Lux.Form;
-using Lux.Spreadsheet;
+using Klyroo.Agent;
+using Klyroo.Dashboard;
+using Klyroo.Form;
+using Klyroo.Spreadsheet;
 using Xunit;
 
-namespace Lux.Agent.Tests;
+namespace Klyroo.Agent.Tests;
 
 public sealed class AgentBridgeDeepTests
 {
@@ -46,12 +46,12 @@ public sealed class AgentBridgeDeepTests
         // Toggle checkbox -> Hidden Note becomes visible; clear & reset org; navigate steps
         var act1 = await agent.ActAsync([
             new AgentActStep("Newsletter", "toggle"),
-            new AgentActStep("Org Name", "setValue", ["LuxCorp"]),
+            new AgentActStep("Org Name", "setValue", ["KlyrooCorp"]),
             new AgentActStep("Onboarding Wizard", "nextStep")
         ]);
         Assert.True(act1.Ok);
         Assert.True(wizard.GetValue<bool>("newsletter"));
-        Assert.Equal("LuxCorp", wizard.GetValue<string>("org"));
+        Assert.Equal("KlyrooCorp", wizard.GetValue<string>("org"));
         Assert.Equal("step2", wizard.CurrentStep?.Key);
 
         var act2 = await agent.ActAsync([

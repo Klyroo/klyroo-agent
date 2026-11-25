@@ -6,12 +6,12 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
-    <ProjectReference Include="..\..\src\Lux.Agent.Core\Lux.Agent.Core.csproj" />
-    <ProjectReference Include="..\..\src\Lux.Agent\Lux.Agent.csproj" />
+    <ProjectReference Include="..\..\src\Klyroo.Agent.Core\Klyroo.Agent.Core.csproj" />
+    <ProjectReference Include="..\..\src\Klyroo.Agent\Klyroo.Agent.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Using Include="Lux.Form" />
-    <Using Include="Lux.Dashboard" />
-    <Using Include="Lux.Spreadsheet" />
+    <Using Include="Klyroo.Form" />
+    <Using Include="Klyroo.Dashboard" />
+    <Using Include="Klyroo.Spreadsheet" />
   </ItemGroup>
 </Project>

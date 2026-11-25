@@ -1,10 +1,10 @@
-using Lux.Agent;
-using Lux.Dashboard;
-using Lux.Form;
-using Lux.Spreadsheet;
+using Klyroo.Agent;
+using Klyroo.Dashboard;
+using Klyroo.Form;
+using Klyroo.Spreadsheet;
 using Xunit;
 
-namespace Lux.Agent.Tests;
+namespace Klyroo.Agent.Tests;
 
 public sealed class ComprehensiveAgentTests
 {
@@ -45,11 +45,11 @@ public sealed class ComprehensiveAgentTests
 
         // 3. Multi-controller ActAsync
         var ok = await agent.ActAsync([
-            new AgentActStep("Project Name", "setValue", ["LuxStack"]),
+            new AgentActStep("Project Name", "setValue", ["Klyroo"]),
             new AgentActStep("rev", "setView", ["cohorts"])
         ]);
         Assert.True(ok.Ok);
-        Assert.Equal("LuxStack", form.GetValue<string>("name"));
+        Assert.Equal("Klyroo", form.GetValue<string>("name"));
         Assert.Equal("cohorts", dash.CurrentView);
         Assert.Contains(observed, o => o.Source == AgentChangeSource.Agent && o.Label == "Project Name");
 

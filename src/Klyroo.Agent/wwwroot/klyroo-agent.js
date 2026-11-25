@@ -1,4 +1,4 @@
-// Semantic Agent Runtime (snapshot, query, act), Unified Observe Stream, and WebMCP integration for Lux.UI.
+// Semantic Agent Runtime (snapshot, query, act), Unified Observe Stream, and WebMCP integration for Klyroo.UI.
 // Inspired by ui-sdk.dev (@ui-sdk/core/agent and @ui-sdk/core/observe).
 
 const observers = new Set();
@@ -21,7 +21,7 @@ function normalizeLabel(text) {
 function isSensitiveElement(el) {
   if (!el || !(el instanceof Element)) return false;
   if (el.hasAttribute('data-agent-redact')) return true;
-  if (el.localName === 'lx-pin-input') return true;
+  if (el.localName === 'kly-pin-input') return true;
   if (el instanceof HTMLInputElement && el.type === 'password') return true;
   const input = el.querySelector?.('input[type="password"]');
   return Boolean(input);
@@ -70,7 +70,7 @@ function assignRef(el) {
   return ref;
 }
 
-/** Emits an ObservedChange event to all registered `Lux.observe` subscribers. */
+/** Emits an ObservedChange event to all registered `Klyroo.observe` subscribers. */
 export function emitObservedChange(change) {
   const redacted = change.sensitive
     ? { ...change, value: '[redacted]', previous: '[redacted]' }
@@ -99,16 +99,16 @@ export function observe(callback, { within = null } = {}) {
 function discoverComponents(root = document) {
   if (typeof document === 'undefined') return [];
   const selector = [
-    '[data-lx-primitive]',
-    'lx-select',
-    'lx-select-menu',
-    'lx-tabs',
-    'lx-modal',
-    'lx-collapsible',
-    'lx-accordion',
-    'lx-pin-input',
-    'lx-color-picker',
-    'lx-calendar',
+    '[data-kly-primitive]',
+    'kly-select',
+    'kly-select-menu',
+    'kly-tabs',
+    'kly-modal',
+    'kly-collapsible',
+    'kly-accordion',
+    'kly-pin-input',
+    'kly-color-picker',
+    'kly-calendar',
     '[data-slot="datalist"]',
     '[data-slot="dashboard-filter"]',
     '[data-slot="form-engine"]',
@@ -123,9 +123,9 @@ function discoverComponents(root = document) {
   const list = [];
   for (const el of root.querySelectorAll(selector)) {
     if (seen.has(el)) continue;
-    // Skip inner native controls that belong to a higher-level lx-* custom element already in the list
-    const ownerLx = el.parentElement?.closest('lx-select, lx-select-menu, lx-pin-input, lx-color-picker');
-    if (ownerLx && seen.has(ownerLx)) continue;
+    // Skip inner native controls that belong to a higher-level kly-* custom element already in the list
+    const ownerKly = el.parentElement?.closest('kly-select, kly-select-menu, kly-pin-input, kly-color-picker');
+    if (ownerKly && seen.has(ownerKly)) continue;
     seen.add(el);
     list.push(el);
   }
@@ -139,8 +139,8 @@ function describeElement(el) {
   const disabled = el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true';
   const offPage = !el.isConnected || el.closest('[hidden], dialog:not([open])') !== null;
 
-  if (el.__lxPrimitive) {
-    const prim = el.__lxPrimitive;
+  if (el.__klyPrimitive) {
+    const prim = el.__klyPrimitive;
     const st = prim.store.get();
     const actions = prim.agent?.actions ?? Object.keys(prim.api).filter((k) => !['keydown', 'pointerdown', 'wheel'].includes(k));
     return {
@@ -155,7 +155,7 @@ function describeElement(el) {
   }
 
   const tag = el.localName;
-  if (tag === 'select' || tag === 'lx-select' || tag === 'lx-select-menu') {
+  if (tag === 'select' || tag === 'kly-select' || tag === 'kly-select-menu') {
     const val = el.value ?? el.getAttribute('value') ?? '';
     return {
       ref,
@@ -168,7 +168,7 @@ function describeElement(el) {
     };
   }
 
-  if (tag === 'input' || tag === 'textarea' || tag === 'lx-pin-input') {
+  if (tag === 'input' || tag === 'textarea' || tag === 'kly-pin-input') {
     const type = el.getAttribute('type') || 'text';
     if (type === 'checkbox' || type === 'radio') {
       return {
@@ -229,7 +229,7 @@ function extractChoices(el) {
   }));
 }
 
-/** Creates the Lux Agent runtime (`snapshot`, `query`, `act`, `registerWebMcp`). */
+/** Creates the Klyroo Agent runtime (`snapshot`, `query`, `act`, `registerWebMcp`). */
 export function createAgent({ allow = null } = {}) {
   function snapshot({ within = null } = {}) {
     const root = within instanceof Element ? within : document;
@@ -328,15 +328,15 @@ export function createAgent({ allow = null } = {}) {
       const prevValue = el.value ?? el.getAttribute('value') ?? null;
       const args = step.args ?? [];
 
-      if (el.__lxPrimitive && typeof el.__lxPrimitive.api[step.action] === 'function') {
-        el.__lxPrimitive.api[step.action](...args);
+      if (el.__klyPrimitive && typeof el.__klyPrimitive.api[step.action] === 'function') {
+        el.__klyPrimitive.api[step.action](...args);
       } else if (step.action === 'setValue') {
         const nextVal = args[0] ?? '';
         if ('value' in el) el.value = nextVal;
         el.setAttribute('value', String(nextVal));
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-        el.dispatchEvent(new CustomEvent('lx-change', { bubbles: true, detail: { value: nextVal, source: 'agent' } }));
+        el.dispatchEvent(new CustomEvent('kly-change', { bubbles: true, detail: { value: nextVal, source: 'agent' } }));
       } else if (step.action === 'clear') {
         if ('value' in el) el.value = '';
         el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -392,7 +392,7 @@ export function createAgent({ allow = null } = {}) {
 export const agentTools = [
   {
     name: 'snapshot',
-    description: 'Lists the Lux.UI components on the page, their current state, and the actions they support.',
+    description: 'Lists the Klyroo.UI components on the page, their current state, and the actions they support.',
     annotations: { readOnlyHint: true, untrustedContentHint: true },
     inputSchema: {
       type: 'object',

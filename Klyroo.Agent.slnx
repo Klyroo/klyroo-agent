@@ -1,10 +1,10 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Lux.Agent.Core/Lux.Agent.Core.csproj" />
-    <Project Path="src/Lux.Agent/Lux.Agent.csproj" />
+    <Project Path="src/Klyroo.Agent.Core/Klyroo.Agent.Core.csproj" />
+    <Project Path="src/Klyroo.Agent/Klyroo.Agent.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Lux.Agent.Tests/Lux.Agent.Tests.csproj" />
+    <Project Path="tests/Klyroo.Agent.Tests/Klyroo.Agent.Tests.csproj" />
   </Folder>
   <Folder Name="/examples/">
     <Project Path="examples/HeadlessAgentExample/HeadlessAgentExample.csproj" />

@@ -1,1 +1,1 @@
-# LuxStack AI Copilot App Template
+# Klyroo AI Copilot App Template

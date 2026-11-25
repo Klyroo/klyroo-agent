@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Klyroo.Agent</RootNamespace>
+    <PackageId>Klyroo.Agent</PackageId>
+    <Description>Klyroo Semantic Agent Bridge for Blazor Web &amp; .NET MAUI Hybrid: connects Klyroo.Form, Klyroo.Dashboard, and Klyroo.Spreadsheet to AI agents, WebMCP, and composable browser behaviors.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <ProjectReference Include="..\Klyroo.Agent.Core\Klyroo.Agent.Core.csproj" />
+    <ProjectReference Include="..\..\..\klyroo-form\src\Klyroo.Form.Core\Klyroo.Form.Core.csproj" />
+    <ProjectReference Include="..\..\..\klyroo-dashboard\src\Klyroo.Dashboard.Core\Klyroo.Dashboard.Core.csproj" />
+    <ProjectReference Include="..\..\..\klyroo-spreadsheet\src\Klyroo.Spreadsheet.Core\Klyroo.Spreadsheet.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+    <SupportedPlatform Include="ios" />
+    <SupportedPlatform Include="android" />
+    <SupportedPlatform Include="maccatalyst" />
+    <SupportedPlatform Include="windows" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Klyroo.Form" />
+    <Using Include="Klyroo.Dashboard" />
+    <Using Include="Klyroo.Spreadsheet" />
+  </ItemGroup>
+</Project>

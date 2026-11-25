@@ -1,4 +1,4 @@
-# Recipes & Testing — Lux.Agent
+# Recipes & Testing — Klyroo.Agent
 
 ## Recipe 1: AllowPolicy Gate & Bounded UndoStack<T>
 
@@ -12,7 +12,7 @@ history.Undo(); // restores "Initial"
 
 ## Recipe 2: Headless Unit Testing (`xUnit`)
 
-Test all business logic in `Lux.Agent.Core` without spinning up a browser or Blazor renderer:
+Test all business logic in `Klyroo.Agent.Core` without spinning up a browser or Blazor renderer:
 
 ```csharp
 using Xunit;
@@ -22,7 +22,7 @@ public sealed class AgentUnitTests
     [Fact]
     public void Headless_core_runs_without_ui_host()
     {
-        // Arrange & Act using Lux.Agent.Core directly
+        // Arrange & Act using Klyroo.Agent.Core directly
         // Assert deterministic outputs with zero JSInterop setup
     }
 }
@@ -39,9 +39,9 @@ public sealed class AgentComponentTests : BunitContext
 {
     public AgentComponentTests()
     {
-        Services.AddLuxAgent();
+        Services.AddKlyrooAgent();
     }
 }
 ```
 
-> **Tip**: Always register LuxStack services on `Services` **before** calling `SetRendererInfo(...)` in bUnit tests.
+> **Tip**: Always register Klyroo services on `Services` **before** calling `SetRendererInfo(...)` in bUnit tests.

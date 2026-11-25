@@ -1,11 +1,11 @@
-# API Reference — Lux.Agent
+# API Reference — Klyroo.Agent
 
-Complete public API reference extracted directly from the source code of `Lux.Agent.Core` and `Lux.Agent`.
+Complete public API reference extracted directly from the source code of `Klyroo.Agent.Core` and `Klyroo.Agent`.
 
 ## C# Types, Controllers, Models & Enums
 
 ### `enum AgentChangeSource`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 Source of a component state change reported to `AgentBridgeService.Observe`.
 
@@ -20,27 +20,27 @@ Source of a component state change reported to `AgentBridgeService.Observe`.
 | `Agent` | `enum member` | — |
 
 ### `record ObservedChange`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 A single notification emitted by the unified `observe` change stream.
 
 ### `record AgentComponentSnapshot`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 Snapshot entry describing one component on the page and the actions it currently supports.
 
 ### `record AgentChoiceItem`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 One choice item returned by `AgentBridgeService.Query` for a select, filter, or list component.
 
 ### `record AgentQueryMatch`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 Result entry returned by `AgentBridgeService.Query`.
 
 ### `class AgentQueryRequest`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 Query parameters for `AgentBridgeService.Query`.
 
@@ -51,27 +51,27 @@ Query parameters for `AgentBridgeService.Query`.
 | `Kind` | `string?` | — |
 
 ### `record AgentActStep`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 One action step in an `AgentBridgeService.ActAsync` call.
 
 ### `record AgentActStepOutcome`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 Outcome of a single step in `AgentActResult`.
 
 ### `record AgentActResult`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 Result of an `AgentBridgeService.ActAsync` invocation.
 
 ### `record AgentToolDefinition`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 Tool metadata and hints following the `ui-sdk.dev` Agent / WebMCP specification.
 
 ### `class UndoStack<T>`
-*Package*: `Lux.Agent.Core` · *Source*: `src/Lux.Agent.Core/AgentBridgeModels.cs`
+*Package*: `Klyroo.Agent.Core` · *Source*: `src/Klyroo.Agent.Core/AgentBridgeModels.cs`
 
 Generic undo/redo snapshot stack inspired by `createUndoStack` from `ui-sdk.dev`.
 
@@ -86,7 +86,7 @@ Generic undo/redo snapshot stack inspired by `createUndoStack` from `ui-sdk.dev`
 | `Clear()` | `void` | — |
 
 ### `class AgentBridgeService`
-*Package*: `Lux.Agent` · *Source*: `src/Lux.Agent/AgentBridgeService.cs`
+*Package*: `Klyroo.Agent` · *Source*: `src/Klyroo.Agent/AgentBridgeService.cs`
 
 Semantic Agent Bridge inspired by `ui-sdk.dev` (`createAgent`, `snapshot`, `query`, `act`, `observe`). Allows AI agents and in-app assistants to read component state, query option lists without opening popups, execute semantic actions with permission checks, and subscribe to a unified `ObservedChange` stream with automatic redaction of sensitive fields.
 
@@ -116,9 +116,9 @@ Semantic Agent Bridge inspired by `ui-sdk.dev` (`createAgent`, `snapshot`, `quer
         Func<AgentActStep, bool, Task<bool>>? allow = null)` | `Task<AgentActResult>` | Executes one or more semantic actions in sequence on registered components by ref or case/accent-insensitive label. |
 | `Dispose()` | `void` | — |
 
-### `class LuxAgentServiceCollectionExtensions`
-*Package*: `Lux.Agent` · *Source*: `src/Lux.Agent/LuxAgentServiceCollectionExtensions.cs`
+### `class KlyrooAgentServiceCollectionExtensions`
+*Package*: `Klyroo.Agent` · *Source*: `src/Klyroo.Agent/KlyrooAgentServiceCollectionExtensions.cs`
 
 | Member | Type | Description |
 | :--- | :--- | :--- |
-| `AddLuxAgent(this IServiceCollection services)` | `IServiceCollection` | — |
+| `AddKlyrooAgent(this IServiceCollection services)` | `IServiceCollection` | — |

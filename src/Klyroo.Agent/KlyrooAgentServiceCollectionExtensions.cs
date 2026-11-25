@@ -1,11 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Lux.Agent;
+namespace Klyroo.Agent;
 
-public static class LuxAgentServiceCollectionExtensions
+public static class KlyrooAgentServiceCollectionExtensions
 {
-    public static IServiceCollection AddLuxAgent(this IServiceCollection services)
+    public static IServiceCollection AddKlyrooAgent(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         services.TryAddScoped<AgentBridgeService>();

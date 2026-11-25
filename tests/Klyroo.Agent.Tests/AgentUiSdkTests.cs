@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Lux.Agent.Tests;
+namespace Klyroo.Agent.Tests;
 
 public sealed class AgentUiSdkTests
 {
@@ -9,7 +9,7 @@ public sealed class AgentUiSdkTests
     public async Task AgentBridgeService_snapshots_queries_acts_and_observes_with_redaction_and_permissions()
     {
         var services = new ServiceCollection();
-        services.AddLuxAgent();
+        services.AddKlyrooAgent();
         using var provider = services.BuildServiceProvider();
         var agent = provider.GetRequiredService<AgentBridgeService>();
 

@@ -1,4 +1,4 @@
-namespace Lux.Agent;
+namespace Klyroo.Agent;
 
 /// <summary>Source of a component state change reported to <c>AgentBridgeService.Observe</c>.</summary>
 public enum AgentChangeSource
