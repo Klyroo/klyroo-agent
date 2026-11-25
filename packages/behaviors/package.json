@@ -3,5 +3,5 @@
   "version": "1.0.0",
   "type": "module",
   "main": "./index.js",
-  "description": "Klyroo composable headless UI behaviors (focus, selection, popups, reorder, resize, viewport, inline-edit, undo) inspired by ui-sdk.dev."
+  "description": "Klyroo composable headless UI behaviors: focus, selection, popups, reorder, resize, viewport, inline edit and undo."
 }
