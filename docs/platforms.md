@@ -33,6 +33,8 @@ session, which is your application's responsibility, for example through a servi
 Register the bridge after `AddMauiBlazorWebView()`:
 
 ```csharp
+using Klyroo.Agent;
+
 builder.Services.AddMauiBlazorWebView();
 builder.Services.AddKlyrooAgent();
 ```

@@ -40,6 +40,8 @@ dotnet add package Klyroo.Agent --prerelease
 Register the bridge in `Program.cs` (Blazor) or `MauiProgram.cs` (.NET MAUI Blazor Hybrid):
 
 ```csharp
+using Klyroo.Agent;
+
 builder.Services.AddKlyrooAgent();
 ```
 
