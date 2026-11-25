@@ -241,6 +241,10 @@ Exposes Klyroo.Form, Klyroo.Dashboard and Klyroo.Spreadsheet controllers to an A
 | :--- | :--- |
 | `AgentBridgeService()` | Creates an empty bridge with no registered components and no `AgentBridgeService.AllowPolicy`. |
 
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `const RedactedValue = "[redacted]"` | `string` | The text that replaces the value of password and one-time-code fields in snapshots, results and observed changes. |
+
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | `AllowPolicy` (get, set) | `Func<AgentActStep, bool, Task<bool>>?` | An optional gate called before every `AgentBridgeService.ActAsync` step with the step and whether the target was registered as confirmation-required. Return `false` to refuse the step. When this is `null`, steps are never refused, including steps on confirmation-required targets. |
