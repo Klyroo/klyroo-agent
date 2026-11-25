@@ -5,7 +5,6 @@
     <PackageId>Klyroo.Agent</PackageId>
     <Description>Klyroo Semantic Agent Bridge for Blazor Web &amp; .NET MAUI Hybrid: connects Klyroo.Form, Klyroo.Dashboard, and Klyroo.Spreadsheet to AI agents, WebMCP, and composable browser behaviors.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
   <ItemGroup>

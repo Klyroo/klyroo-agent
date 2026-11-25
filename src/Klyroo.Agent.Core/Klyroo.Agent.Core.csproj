@@ -5,7 +5,6 @@
     <PackageId>Klyroo.Agent.Core</PackageId>
     <Description>Klyroo Agent Core: models of the agent bridge (snapshot, query, act, observe) and UndoStack. No dependencies, NativeAOT compatible.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <IsTrimmable>true</IsTrimmable>
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
