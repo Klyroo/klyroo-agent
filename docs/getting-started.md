@@ -1,79 +1,159 @@
-# Getting Started with Klyroo.Agent
+# Getting started
 
-Inspired by ui-sdk.dev: makes Klyroo.Form, Klyroo.Dashboard, and Klyroo.Spreadsheet immediately inspectable and operable by AI agents without brittle CSS selectors. Provides semantic Snapshot/Query/Act, global permission policies, automatic [redacted] secret masking, WebMCP browser assets, and UndoStack<T>.
+By the end of this page an agent-style caller will read and edit a form through `AgentBridgeService`, first in a
+console app and then inside a Blazor component.
 
-## 1. Choose Your Package
-
-| Use Case | Package to Install |
-| :--- | :--- |
-| Headless C#, Minimal APIs, Workers, CLI, or native C# .NET MAUI ViewModels | `Klyroo.Agent.Core` |
-| Blazor Web App (Server, WebAssembly, Auto, Static SSR) or `.NET MAUI Blazor Hybrid` | `Klyroo.Agent` |
+## 1. Install
 
 ```bash
-dotnet add package Klyroo.Agent.Core
-dotnet add package Klyroo.Agent
+dotnet add package Klyroo.Agent --prerelease
 ```
 
-## 2. Register Services
+`Klyroo.Agent` brings `Klyroo.Agent.Core` and the Core packages of Klyroo.Form, Klyroo.Dashboard and
+Klyroo.Spreadsheet with it. If you only need the data types and `UndoStack<T>`, install `Klyroo.Agent.Core`.
+There is no stylesheet to reference.
 
-Call `builder.Services.AddKlyrooAgent();` in `Program.cs` (both Server and Client projects when using Blazor Interactive Auto) or `MauiProgram.cs` (after `AddMauiBlazorWebView()`):
+## 2. Register the bridge
+
+In `Program.cs` of a Blazor app, or in `MauiProgram.cs` after `AddMauiBlazorWebView()`:
 
 ```csharp
+using Klyroo.Agent;
+
 builder.Services.AddKlyrooAgent();
 ```
 
-## 3. Add Namespace Imports
+The service is scoped: each Blazor circuit, request or MAUI scope gets its own `AgentBridgeService`. In an
+interactive Auto app, register it on both the server and the client project.
+
+## 3. Add imports
 
 In `_Imports.razor`:
 
 ```razor
-@using Klyroo.UI
 @using Klyroo.Agent
 @using Klyroo.Form
-@using Klyroo.Dashboard
-@using Klyroo.Spreadsheet
-
 ```
 
-## 4. First Example
+Add `Klyroo.Dashboard` and `Klyroo.Spreadsheet` the same way if you register those controllers.
 
-### Headless C# (`Klyroo.Agent.Core`)
+## 4. Build a working example, headless
+
+The bridge works on controllers, so you can try it without a UI. This console program registers a form and runs
+the three operations.
 
 ```csharp
 using Klyroo.Agent;
 using Klyroo.Form;
-using Klyroo.Dashboard;
-using Klyroo.Spreadsheet;
 
-agent.RegisterForm(form, confirmSubmit: true);
-agent.RegisterDashboard(dashboard);
+var agent = new AgentBridgeService();
 
-// Inspect choices accent-insensitively without opening any popup
-var choices = agent.Query(new AgentQueryRequest { Within = "region", Text = "Europe" });
+var form = new FormController(new FormSchema
+{
+    FormKey = "project-settings",
+    Title = "Project settings",
+    Fields =
+    [
+        new FormFieldSchema { Key = "name", Label = "Project name", DefaultValue = "Apollo" },
+        new FormFieldSchema
+        {
+            Key = "region",
+            Label = "Region",
+            Kind = FormFieldKind.Select,
+            DefaultValue = "us-east",
+            Options =
+            [
+                new FormOptionItem("us-east", "US East"),
+                new FormOptionItem("eu-west", "Europe West"),
+            ],
+        },
+    ],
+});
 
-// Execute semantic steps with policy checks & automatic secret redaction
-var result = await agent.ActAsync([
-    new AgentActStep("project name", "setValue", ["Atlas"]),
-    new AgentActStep("region", "setValue", ["eu-west"])
-]);
+agent.RegisterForm(form);
 ```
 
-### Blazor / MAUI Hybrid (`Klyroo.Agent`)
+`Snapshot` shows what an agent sees. Each entry has a reference, a component kind, the label and the current value:
+
+```csharp
+foreach (var component in agent.Snapshot())
+{
+    Console.WriteLine($"{component.Ref} {component.Component} \"{component.Label}\" = {component.Value}");
+}
+// c1 input "Project name" = Apollo
+// c2 select "Region" = us-east
+// c3 form "Project settings" = clean
+```
+
+`Query` lists the choices of the select without opening anything:
+
+```csharp
+var matches = agent.Query(new AgentQueryRequest { Within = "region", Text = "europe" });
+Console.WriteLine(matches[0].Items[0].Value); // eu-west
+```
+
+`ActAsync` runs steps in order. The first argument of a step is a component reference (`c1`) or its label, in any case:
+
+```csharp
+var result = await agent.ActAsync(
+[
+    new AgentActStep("Project name", "setValue", ["Atlas"]),
+    new AgentActStep("Region", "setValue", ["eu-west"]),
+]);
+
+Console.WriteLine(result.Ok ? "done" : result.Error);
+Console.WriteLine(form.GetValue<string>("name")); // Atlas
+```
+
+If a step fails, `result.Ok` is `false`, `result.Error` names the step and the reason, and the later steps do not
+run. Earlier steps stay applied.
+
+## 5. Use it from Blazor
+
+Inject the scoped service in the component that owns the controller and register the controller once, in
+`OnInitialized`:
 
 ```razor
-// Served automatically via _content/Klyroo.Agent/klyroo-agent.js
-const snap = window.Klyroo.agent.snapshot();
-const res  = await window.Klyroo.agent.act([
-  { ref: 'Project name', action: 'setValue', args: ['Atlas'] }
-]);
+@using Klyroo.Agent
+@using Klyroo.Form
+@inject AgentBridgeService Agent
 
-// Privacy-preserving observation stream (passwords auto-masked as "[redacted]")
-const stop = window.Klyroo.agent.observe(evt => console.log(evt));
+<h1>@_form.Schema.Title</h1>
+<p>Project name: @(_form.GetValue<string>("name"))</p>
+
+@code {
+    private FormController _form = default!;
+
+    protected override void OnInitialized()
+    {
+        _form = new FormController(new FormSchema
+        {
+            FormKey = "project-settings",
+            Title = "Project settings",
+            Fields =
+            [
+                new FormFieldSchema { Key = "name", Label = "Project name", DefaultValue = "Apollo" },
+            ],
+        });
+        _form.Changed += () => InvokeAsync(StateHasChanged);
+
+        Agent.RegisterForm(_form, confirmSubmit: true);
+    }
+}
 ```
 
-## Next Steps
+The component renders the same controller that the agent edits, so a change made through `ActAsync` shows up in
+the page after `Changed` fires. Render the form with the Klyroo.Form components if you use them; the bridge does
+not care how the controller is displayed.
 
-- [Architecture & Two-Layer Design](./architecture.md)
-- [Complete API Reference](./api-reference.md)
-- [.NET MAUI & NativeAOT Guide](./maui-and-aot.md)
-- [Recipes & Testing](./recipes.md)
+Something still has to call `Snapshot`, `Query` and `ActAsync`: your own endpoint, a SignalR hub, an in-app
+assistant, or an MCP server. [Expose the three operations as tools](guides.md#expose-the-operations-as-llm-tools)
+shows a handler you can start from.
+
+## Next steps
+
+- [Require approval before consequential actions](guides.md#require-approval-before-consequential-actions)
+- [Guides](guides.md)
+- [Concepts](concepts.md)
+- [Platforms](platforms.md)
+- [API reference](api-reference.md)

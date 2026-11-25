@@ -1,18 +1,42 @@
 namespace Klyroo.Agent;
 
-/// <summary>Source of a component state change reported to <c>AgentBridgeService.Observe</c>.</summary>
+/// <summary>
+/// Identifies what caused a state change reported in <see cref="ObservedChange.Source"/>. The .NET
+/// <c>AgentBridgeService</c> only raises changes caused by <c>ActAsync</c>, so it always reports <see cref="Agent"/>;
+/// the other members let your own code classify changes it forwards through the same record type.
+/// </summary>
 public enum AgentChangeSource
 {
+    /// <summary>The change came from keyboard input.</summary>
     Keyboard,
+    /// <summary>The change came from a mouse interaction.</summary>
     Mouse,
+    /// <summary>The change came from a touch interaction.</summary>
     Touch,
+    /// <summary>The change came from a pen interaction.</summary>
     Pen,
+    /// <summary>The change came from an assistive technology or a synthetic click.</summary>
     Virtual,
+    /// <summary>The change was made by application code rather than by a user or an agent.</summary>
     Programmatic,
+    /// <summary>The change was made by an agent through <c>AgentBridgeService.ActAsync</c>.</summary>
     Agent,
 }
 
-/// <summary>A single notification emitted by the unified <c>observe</c> change stream.</summary>
+/// <summary>
+/// A notification delivered to subscribers of <c>AgentBridgeService.Observe</c> after an action step succeeds.
+/// For password and one-time-code fields, <paramref name="Previous"/> and <paramref name="Value"/> are replaced by
+/// <c>"[redacted]"</c>.
+/// </summary>
+/// <param name="Component">The component kind, for example <c>input</c>, <c>select</c>, <c>form</c> or <c>dashboard</c>.</param>
+/// <param name="Ref">The stable reference of the component, for example <c>c3</c>.</param>
+/// <param name="Label">The label the component was registered with.</param>
+/// <param name="Key">The property that changed. The bridge always reports <c>value</c>.</param>
+/// <param name="Previous">The value before the step ran.</param>
+/// <param name="Value">The value after the step ran.</param>
+/// <param name="Reason">The action name that caused the change, for example <c>setValue</c>.</param>
+/// <param name="Source">What caused the change.</param>
+/// <param name="Row">An optional row identifier for tabular components. The bridge does not set it.</param>
 public sealed record ObservedChange(
     string Component,
     string Ref,
@@ -24,7 +48,15 @@ public sealed record ObservedChange(
     AgentChangeSource Source,
     string? Row = null);
 
-/// <summary>Snapshot entry describing one component on the page and the actions it currently supports.</summary>
+/// <summary>One registered component as returned by <c>AgentBridgeService.Snapshot</c>.</summary>
+/// <param name="Ref">The stable reference (<c>c1</c>, <c>c2</c>, ...) used to address the component in an action step.</param>
+/// <param name="Component">The component kind: <c>input</c>, <c>select</c>, <c>checkbox</c>, <c>number</c>, <c>form</c>, <c>dashboard</c> or <c>spreadsheet</c>.</param>
+/// <param name="Label">The human-readable label an agent can also use to address the component.</param>
+/// <param name="Value">The current value, or <c>"[redacted]"</c> for a sensitive field.</param>
+/// <param name="Actions">The action names the component accepts in <see cref="AgentActStep.Action"/>.</param>
+/// <param name="Disabled">Whether the component currently rejects actions.</param>
+/// <param name="OffPage">Whether the component is not rendered right now, for example a conditional form field whose condition is false.</param>
+/// <param name="ConfirmRequired">Whether the component was registered as needing confirmation. The bridge only reports the flag to <c>AllowPolicy</c>; it does not block anything by itself.</param>
 public sealed record AgentComponentSnapshot(
     string Ref,
     string Component,
@@ -35,14 +67,23 @@ public sealed record AgentComponentSnapshot(
     bool OffPage = false,
     bool ConfirmRequired = false);
 
-/// <summary>One choice item returned by <c>AgentBridgeService.Query</c> for a select, filter, or list component.</summary>
+/// <summary>One selectable option of a select, filter or view list, as returned by <c>AgentBridgeService.Query</c>.</summary>
+/// <param name="Value">The value to pass as the argument of <c>setValue</c> or <c>toggle</c>.</param>
+/// <param name="Label">The text shown to the user.</param>
+/// <param name="Selected">Whether the option is currently selected.</param>
+/// <param name="Disabled">Whether the option cannot be chosen.</param>
 public sealed record AgentChoiceItem(
     string Value,
     string Label,
     bool Selected = false,
     bool Disabled = false);
 
-/// <summary>Result entry returned by <c>AgentBridgeService.Query</c>.</summary>
+/// <summary>A component matched by <c>AgentBridgeService.Query</c>, with the choices that matched.</summary>
+/// <param name="Ref">The stable reference of the component.</param>
+/// <param name="Component">The component kind.</param>
+/// <param name="Label">The component label.</param>
+/// <param name="Items">At most 50 matching choices.</param>
+/// <param name="More">How many matching choices were left out because of the 50 item limit.</param>
 public sealed record AgentQueryMatch(
     string Ref,
     string Component,
@@ -50,35 +91,72 @@ public sealed record AgentQueryMatch(
     IReadOnlyList<AgentChoiceItem> Items,
     int More = 0);
 
-/// <summary>Query parameters for <c>AgentBridgeService.Query</c>.</summary>
+/// <summary>
+/// Filters for <c>AgentBridgeService.Query</c>. All text comparisons ignore case, accents and repeated whitespace.
+/// </summary>
 public sealed class AgentQueryRequest
 {
+    /// <summary>Creates a request with no filters, which matches every component.</summary>
+    public AgentQueryRequest()
+    {
+    }
+
+    /// <summary>
+    /// A component reference or label. When set, the query only inspects that component's choices and the
+    /// other filters apply to those choices. A <c>Within</c> value that matches nothing returns an empty list.
+    /// </summary>
     public string? Within { get; init; }
+
+    /// <summary>Text that must appear in a component label, or in the label or value of one of its choices.</summary>
     public string? Text { get; init; }
+
+    /// <summary>Restricts the result to one component kind, for example <c>select</c>. Ignored when <see cref="Within"/> is set.</summary>
     public string? Kind { get; init; }
 }
 
-/// <summary>One action step in an <c>AgentBridgeService.ActAsync</c> call.</summary>
+/// <summary>One action to run in an <c>AgentBridgeService.ActAsync</c> call.</summary>
+/// <param name="Ref">A component reference such as <c>c2</c>, or a component label.</param>
+/// <param name="Action">The action name, which must be one of the component's <see cref="AgentComponentSnapshot.Actions"/>.</param>
+/// <param name="Args">The action arguments, for example the new value for <c>setValue</c>. <see langword="null"/> means no arguments.</param>
 public sealed record AgentActStep(
     string Ref,
     string Action,
     IReadOnlyList<object?>? Args = null);
 
-/// <summary>Outcome of a single step in <c>AgentActResult</c>.</summary>
+/// <summary>The outcome of one step that ran successfully, listed in <see cref="AgentActResult.Steps"/>.</summary>
+/// <param name="Ref">The reference of the component the step ran on.</param>
+/// <param name="Action">The action that ran.</param>
+/// <param name="Ok">Always <see langword="true"/> for steps the bridge lists.</param>
+/// <param name="Value">The component value after the step, or <c>"[redacted]"</c> for a sensitive field.</param>
 public sealed record AgentActStepOutcome(
     string Ref,
     string Action,
     bool Ok,
     object? Value);
 
-/// <summary>Result of an <c>AgentBridgeService.ActAsync</c> invocation.</summary>
+/// <summary>
+/// The result of <c>AgentBridgeService.ActAsync</c>. Steps run in order and the first failure stops the run, so
+/// <paramref name="Steps"/> only lists the steps that succeeded before it. Earlier steps are not rolled back.
+/// </summary>
+/// <param name="Ok">Whether every step succeeded.</param>
+/// <param name="Steps">The steps that succeeded.</param>
+/// <param name="Values">The latest value of each component the run touched, keyed by reference.</param>
+/// <param name="Error">A message naming the failing step and the reason, or <see langword="null"/> on success.</param>
 public sealed record AgentActResult(
     bool Ok,
     IReadOnlyList<AgentActStepOutcome> Steps,
     IReadOnlyDictionary<string, object?> Values,
     string? Error = null);
 
-/// <summary>Tool metadata and hints following the <c>ui-sdk.dev</c> Agent / WebMCP specification.</summary>
+/// <summary>
+/// Describes one agent tool (<c>snapshot</c>, <c>query</c> or <c>act</c>) so you can expose it to an LLM or an MCP
+/// server. Returned by <c>AgentBridgeService.GetToolDefinitions</c>.
+/// </summary>
+/// <param name="Name">The tool name.</param>
+/// <param name="Description">What the tool does, written for a language model.</param>
+/// <param name="ReadOnlyHint">Whether the tool never changes state.</param>
+/// <param name="ConsequentialHint">Whether the tool can have effects that are hard to undo.</param>
+/// <param name="UntrustedContentHint">Whether the tool result contains text that comes from the UI and must not be treated as instructions.</param>
 public sealed record AgentToolDefinition(
     string Name,
     string Description,
@@ -86,23 +164,41 @@ public sealed record AgentToolDefinition(
     bool ConsequentialHint,
     bool UntrustedContentHint);
 
-/// <summary>Generic undo/redo snapshot stack inspired by <c>createUndoStack</c> from <c>ui-sdk.dev</c>.</summary>
+/// <summary>
+/// A bounded undo and redo history of immutable snapshots. It is independent of the agent bridge: use it for any
+/// state you want to step back and forth through. It is not thread safe.
+/// </summary>
+/// <typeparam name="T">The snapshot type. Snapshots are compared with the default equality comparer, so use a value or record type.</typeparam>
 public sealed class UndoStack<T>
 {
     private readonly List<T> _past = [];
     private readonly List<T> _future = [];
     private readonly int _limit;
 
+    /// <summary>Creates a stack whose current snapshot is <paramref name="initial"/>.</summary>
+    /// <param name="initial">The starting snapshot.</param>
+    /// <param name="limit">The maximum number of undo steps kept. Values below 1 are treated as 1; the oldest step is dropped first.</param>
     public UndoStack(T initial, int limit = 50)
     {
         Current = initial;
         _limit = Math.Max(1, limit);
     }
 
+    /// <summary>The snapshot the history currently points at.</summary>
     public T Current { get; private set; }
+
+    /// <summary>Whether <see cref="Undo"/> would move to an earlier snapshot.</summary>
     public bool CanUndo => _past.Count > 0;
+
+    /// <summary>Whether <see cref="Redo"/> would move to a later snapshot.</summary>
     public bool CanRedo => _future.Count > 0;
 
+    /// <summary>
+    /// Makes <paramref name="next"/> the current snapshot and discards any redo history. Does nothing when
+    /// <paramref name="next"/> equals <see cref="Current"/>.
+    /// </summary>
+    /// <param name="next">The new snapshot.</param>
+    /// <returns>The current snapshot after the call.</returns>
     public T Record(T next)
     {
         if (EqualityComparer<T>.Default.Equals(Current, next)) return Current;
@@ -113,6 +209,8 @@ public sealed class UndoStack<T>
         return Current;
     }
 
+    /// <summary>Moves back one snapshot. Does nothing when <see cref="CanUndo"/> is <see langword="false"/>.</summary>
+    /// <returns>The current snapshot after the call.</returns>
     public T Undo()
     {
         if (_past.Count == 0) return Current;
@@ -122,6 +220,8 @@ public sealed class UndoStack<T>
         return Current;
     }
 
+    /// <summary>Moves forward one snapshot. Does nothing when <see cref="CanRedo"/> is <see langword="false"/>.</summary>
+    /// <returns>The current snapshot after the call.</returns>
     public T Redo()
     {
         if (_future.Count == 0) return Current;
@@ -131,6 +231,7 @@ public sealed class UndoStack<T>
         return Current;
     }
 
+    /// <summary>Forgets the undo and redo history and keeps <see cref="Current"/>.</summary>
     public void Clear()
     {
         _past.Clear();

@@ -4,13 +4,16 @@ using System.Text;
 namespace Klyroo.Agent;
 
 /// <summary>
-/// Semantic Agent Bridge inspired by <c>ui-sdk.dev</c> (<c>createAgent</c>, <c>snapshot</c>, <c>query</c>, <c>act</c>, <c>observe</c>).
-/// Allows AI agents and in-app assistants to read component state, query option lists without opening popups,
-/// execute semantic actions with permission checks, and subscribe to a unified <see cref="ObservedChange"/> stream
-/// with automatic redaction of sensitive fields.
+/// Exposes Klyroo.Form, Klyroo.Dashboard and Klyroo.Spreadsheet controllers to an AI agent through three
+/// operations: <see cref="Snapshot"/> lists what is registered, <see cref="Query"/> lists the choices of a
+/// select or filter, and <see cref="ActAsync"/> runs named actions. Register the controllers you want to expose,
+/// then call these methods from your tool handlers. The service works on the controllers, not on rendered markup,
+/// so it needs no JavaScript interop and behaves the same in every render mode. It is not thread safe: use one
+/// instance per user session, which is what <c>AddKlyrooAgent</c> provides.
 /// </summary>
 public sealed class AgentBridgeService
 {
+    /// <summary>The text that replaces the value of password and one-time-code fields in snapshots, results and observed changes.</summary>
     public const string RedactedValue = "[redacted]";
 
     private sealed class BoundTarget
@@ -28,14 +31,24 @@ public sealed class AgentBridgeService
         public bool ConfirmRequired { get; init; }
     }
 
+    /// <summary>Creates an empty bridge with no registered components and no <see cref="AllowPolicy"/>.</summary>
+    public AgentBridgeService()
+    {
+    }
+
     private readonly List<BoundTarget> _targets = [];
     private readonly List<Action<ObservedChange>> _observers = [];
     private int _refCounter;
 
-    /// <summary>Optional global permission gate checked before every <see cref="ActAsync"/> step.</summary>
+    /// <summary>
+    /// An optional gate called before every <see cref="ActAsync"/> step with the step and whether the target was
+    /// registered as confirmation-required. Return <see langword="false"/> to refuse the step. When this is
+    /// <see langword="null"/>, steps are never refused, including steps on confirmation-required targets.
+    /// </summary>
     public Func<AgentActStep, bool, Task<bool>>? AllowPolicy { get; set; }
 
-    /// <summary>Returns the three standard <c>ui-sdk.dev</c> agent tools (<c>snapshot</c>, <c>query</c>, <c>act</c>).</summary>
+    /// <summary>Returns the definitions of the three agent tools, <c>snapshot</c>, <c>query</c> and <c>act</c>, for registration with an LLM or MCP host.</summary>
+    /// <returns>Three <see cref="AgentToolDefinition"/> values.</returns>
     public static IReadOnlyList<AgentToolDefinition> GetToolDefinitions() =>
     [
         new("snapshot", "Lists the components on the page, their current state, and available actions.", ReadOnlyHint: true, ConsequentialHint: false, UntrustedContentHint: true),
@@ -43,7 +56,13 @@ public sealed class AgentBridgeService
         new("act", "Calls semantic actions on components by ref or label (e.g. setValue, clear, toggle, reset, submit).", ReadOnlyHint: false, ConsequentialHint: true, UntrustedContentHint: true),
     ];
 
-    /// <summary>Subscribes to all component state changes across registered controllers. Returns an <see cref="IDisposable"/> to unsubscribe.</summary>
+    /// <summary>
+    /// Subscribes to the changes made through <see cref="ActAsync"/>. The callback runs synchronously after each
+    /// successful step. Changes a user makes directly in the UI are not reported.
+    /// </summary>
+    /// <param name="callback">Called with one <see cref="ObservedChange"/> per successful step.</param>
+    /// <returns>A handle that removes the subscription when disposed.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="callback"/> is <see langword="null"/>.</exception>
     public IDisposable Observe(Action<ObservedChange> callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
@@ -51,7 +70,18 @@ public sealed class AgentBridgeService
         return new ObserverSubscription(_observers, callback);
     }
 
-    /// <summary>Registers a <see cref="FormController"/> and all its fields with the agent bridge.</summary>
+    /// <summary>
+    /// Registers every stateful field of a form, plus the form itself. Fields become <c>input</c>, <c>select</c>,
+    /// <c>checkbox</c> or <c>number</c> components; the form accepts <c>submit</c>, <c>reset</c> and, for stepped
+    /// forms, <c>nextStep</c> and <c>previousStep</c>. Password and one-time-code fields are always redacted.
+    /// Registering the same form twice creates duplicate labels, which <see cref="ActAsync"/> rejects as ambiguous.
+    /// </summary>
+    /// <param name="form">The form to expose.</param>
+    /// <param name="confirmSubmit">
+    /// Marks the form component as confirmation-required, which is passed to <see cref="AllowPolicy"/> for every
+    /// action on the form (<c>submit</c>, <c>reset</c> and step navigation).
+    /// </param>
+    /// <exception cref="ArgumentNullException"><paramref name="form"/> is <see langword="null"/>.</exception>
     public void RegisterForm(FormController form, bool confirmSubmit = false)
     {
         ArgumentNullException.ThrowIfNull(form);
@@ -145,7 +175,12 @@ public sealed class AgentBridgeService
         });
     }
 
-    /// <summary>Registers a <see cref="DashboardController"/> (its filters, views, and refresh action) with the agent bridge.</summary>
+    /// <summary>
+    /// Registers a dashboard. Each non-headless filter becomes a <c>select</c> component, and the dashboard itself
+    /// accepts <c>setView</c>, <c>resetFilters</c> and <c>refresh</c>.
+    /// </summary>
+    /// <param name="dashboard">The dashboard to expose.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="dashboard"/> is <see langword="null"/>.</exception>
     public void RegisterDashboard(DashboardController dashboard)
     {
         ArgumentNullException.ThrowIfNull(dashboard);
@@ -215,7 +250,12 @@ public sealed class AgentBridgeService
         });
     }
 
-    /// <summary>Registers a <see cref="SpreadsheetImporter"/> with the agent bridge.</summary>
+    /// <summary>
+    /// Registers an importer as one <c>spreadsheet</c> component that accepts <c>editCell</c>, <c>nextStep</c>,
+    /// <c>previousStep</c>, <c>submit</c> and <c>clearFile</c>. Loading the file itself is not an agent action.
+    /// </summary>
+    /// <param name="importer">The importer to expose.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="importer"/> is <see langword="null"/>.</exception>
     public void RegisterSpreadsheet(SpreadsheetImporter importer)
     {
         ArgumentNullException.ThrowIfNull(importer);
@@ -255,7 +295,9 @@ public sealed class AgentBridgeService
         });
     }
 
-    /// <summary>Returns a semantic snapshot of up to 100 registered components, their state, and their available actions.</summary>
+    /// <summary>Lists the registered components in registration order, with their current value and available actions. At most 100 are returned.</summary>
+    /// <param name="includeOffPage">When <see langword="false"/>, components that are not rendered, such as conditional form fields whose condition is false, are left out.</param>
+    /// <returns>One <see cref="AgentComponentSnapshot"/> per component.</returns>
     public IReadOnlyList<AgentComponentSnapshot> Snapshot(bool includeOffPage = true)
     {
         var results = new List<AgentComponentSnapshot>();
@@ -278,7 +320,12 @@ public sealed class AgentBridgeService
         return results;
     }
 
-    /// <summary>Finds components by label or kind, or queries available choices inside a component without opening popups.</summary>
+    /// <summary>
+    /// Finds components by label, kind or choice text, or lists the choices of one component, without opening any
+    /// popup. Matching ignores case and accents.
+    /// </summary>
+    /// <param name="request">The filters, or <see langword="null"/> to match every component.</param>
+    /// <returns>The matching components, each with at most 50 matching choices.</returns>
     public IReadOnlyList<AgentQueryMatch> Query(AgentQueryRequest? request = null)
     {
         var req = request ?? new AgentQueryRequest();
@@ -332,7 +379,17 @@ public sealed class AgentBridgeService
         return matches;
     }
 
-    /// <summary>Executes one or more semantic actions in sequence on registered components by ref or case/accent-insensitive label.</summary>
+    /// <summary>
+    /// Runs the steps in order. A step is resolved by reference or by label (case and accent insensitive), then
+    /// checked for existence, ambiguity, disabled state and supported action, then passed to <see cref="AllowPolicy"/>
+    /// and <paramref name="allow"/>. The first failing step stops the run; steps that already ran are not rolled
+    /// back. Each successful step raises one <see cref="ObservedChange"/>. Failures are reported in
+    /// <see cref="AgentActResult.Error"/> rather than thrown.
+    /// </summary>
+    /// <param name="steps">The steps to run.</param>
+    /// <param name="allow">An extra gate for this call only, called after <see cref="AllowPolicy"/> with the same arguments.</param>
+    /// <returns>The outcome of the run.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="steps"/> is <see langword="null"/>.</exception>
     public async Task<AgentActResult> ActAsync(
         IReadOnlyList<AgentActStep> steps,
         Func<AgentActStep, bool, Task<bool>>? allow = null)

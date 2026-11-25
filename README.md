@@ -1,134 +1,147 @@
 # Klyroo.Agent
 
-*Part of [Klyroo](https://klyroo.dev): Build better. Compose freely.*
+A semantic bridge that lets AI agents read and operate Klyroo forms, dashboards and spreadsheet imports from .NET code.
 
-[![CI](https://github.com/klyroo/klyroo-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/klyroo/klyroo-agent/actions/workflows/ci.yml) [![NuGet](https://img.shields.io/badge/NuGet-0.1.0--preview.1-004880.svg)](https://www.nuget.org/packages/Klyroo.Agent) [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/) [![NativeAOT](https://img.shields.io/badge/NativeAOT-Compatible-10b981.svg)](https://klyroo.dev/why) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![CI](https://github.com/klyroo/klyroo-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/klyroo/klyroo-agent/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/vpre/Klyroo.Agent.svg)](https://www.nuget.org/packages/Klyroo.Agent)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **Semantic AI Agent Bridge (snapshot/query/act), WebMCP tools, observe stream & UndoStack**
+An agent that drives a UI through CSS selectors breaks whenever the markup changes. Klyroo.Agent skips the markup:
+you register the controllers behind your UI, and the agent works with their labels, values and named actions. The
+bridge is plain C# with no JavaScript interop, so it behaves the same in every Blazor render mode, in .NET MAUI and
+in a console app.
 
-Inspired by ui-sdk.dev: makes Klyroo.Form, Klyroo.Dashboard, and Klyroo.Spreadsheet immediately inspectable and operable by AI agents without brittle CSS selectors. Provides semantic Snapshot/Query/Act, global permission policies, automatic [redacted] secret masking, WebMCP browser assets, and UndoStack<T>.
+## Features
 
-[![MAUI Hybrid](https://img.shields.io/badge/.NET%20MAUI-Blazor%20Hybrid-8b5cf6.svg)](./docs/maui-and-aot.md)
+- **Snapshot**: lists every registered component with a stable reference (`c1`, `c2`, ...), its label, current value and the actions it accepts, capped at 100 entries.
+- **Query**: lists the choices of a select or filter, filtered by text, without opening a popup. Matching ignores case and accents.
+- **Act**: runs named actions (`setValue`, `toggle`, `clear`, `reset`, `submit`, `nextStep`, `setView`, `refresh`, `editCell`) by reference or label, stops at the first failing step and reports why.
+- **Permission gate**: `AllowPolicy` and a per-call `allow` callback can refuse any step, and forms can be flagged as confirmation-required.
+- **Secret redaction**: password and one-time-code fields appear as `[redacted]` in snapshots, results and observed changes.
+- **Observe**: `Observe` delivers one `ObservedChange` per successful step, with the previous and new value.
+- **Tool definitions**: `GetToolDefinitions` returns the `snapshot`, `query` and `act` tool descriptions, with read-only and consequential hints, ready to hand to an LLM or MCP host.
+- **Browser runtime**: a separate JavaScript module (`klyroo-agent.js`) offers the same three operations over the DOM and can register them with WebMCP when the browser provides it.
 
----
+## Packages
 
-## Architecture (Two-Layer Headless Split)
-
-- **`Klyroo.Agent.Core`** — 100% headless C#, zero UI dependencies, `<IsAotCompatible>true</IsAotCompatible>`, `<IsTrimmable>true</IsTrimmable>`. Runs in Minimal APIs, background workers, CLI apps, and native C# .NET MAUI ViewModels.
-- **`Klyroo.Agent`** — Multiplatform Blazor Web (Static SSR, Interactive Server, WebAssembly, Auto) & `.NET MAUI Blazor Hybrid` (`browser`, `ios`, `android`, `maccatalyst`, `windows`).
-
-## Highlights
-
-- **Semantic Snapshot, Query & Act** (`Semantic Bridge`) — Exposes up to 100 controls by stable ref (c1, c2…), queries select/filter choices without opening popups, and runs semantic actions (setValue, toggle, submit).
-- **Permission Gate & Confirmation Policy** (`Policy Guard`) — Global AllowPolicy or per-call gate with ConfirmRequired flags to approve or block consequential actions before execution.
-- **Observe Stream & Secret Redaction** (`Privacy First`) — Unified ObservedChange stream (Agent/User source) where Password and OneTimeCode fields are always redacted as [redacted].
-- **WebMCP JS Assets & UndoStack<T>** (`WebMCP + Undo`) — Ships _content/Klyroo.Agent/klyroo-agent.js + klyroo-behaviors.js for WebMCP and a bounded generic UndoStack<T> in Klyroo.Agent.Core (NativeAOT).
-
-## Prerequisites
-
-- .NET 10 SDK or later.
-- A Blazor Web App (Static SSR, Interactive Server, WebAssembly or Auto) or a .NET MAUI Blazor Hybrid app for the UI
-  package; the `.Core` package runs anywhere .NET 10 runs, NativeAOT included.
-- For .NET MAUI: the `maui` workload (`dotnet workload install maui`).
+| Package | Description |
+| :--- | :--- |
+| [`Klyroo.Agent.Core`](https://www.nuget.org/packages/Klyroo.Agent.Core) | The data types of the bridge (`AgentActStep`, `AgentActResult`, `ObservedChange`, ...) and `UndoStack<T>`. No dependencies, NativeAOT compatible. |
+| [`Klyroo.Agent`](https://www.nuget.org/packages/Klyroo.Agent) | `AgentBridgeService`, `AddKlyrooAgent()`, and the browser runtime served from `_content/Klyroo.Agent/`. Depends on `Klyroo.Agent.Core`, `Klyroo.Form.Core`, `Klyroo.Dashboard.Core` and `Klyroo.Spreadsheet.Core`. |
+| [`@klyroo/agent`](packages/agent/README.md) | Source of the browser runtime (npm package manifest). Not published to npm; the same file ships inside `Klyroo.Agent`. |
+| [`@klyroo/behaviors`](packages/behaviors/README.md) | Source of a set of headless UI behaviors (focus, selection, popup, undo). Not published to npm; the same file ships inside `Klyroo.Agent`. |
 
 ## Installation
 
 ```bash
-dotnet add package Klyroo.Agent.Core   # Headless C# / NativeAOT / MAUI C#
-dotnet add package Klyroo.Agent        # Blazor Web & .NET MAUI Blazor Hybrid
+dotnet add package Klyroo.Agent --prerelease
 ```
 
-Register services in `Program.cs` (Blazor Web App) or `MauiProgram.cs` (.NET MAUI Blazor Hybrid):
+Register the bridge in `Program.cs` (Blazor) or `MauiProgram.cs` (.NET MAUI Blazor Hybrid):
 
 ```csharp
 builder.Services.AddKlyrooAgent();
 ```
 
-## Quick Start
+`AgentBridgeService` is registered as a scoped service. The package has no stylesheet. If you only need the data
+types, install `Klyroo.Agent.Core` instead.
 
-### Headless Core (`Klyroo.Agent.Core`)
+## Quick start
+
+Register a form, then let a caller inspect it and change it:
 
 ```csharp
 using Klyroo.Agent;
 using Klyroo.Form;
-using Klyroo.Dashboard;
-using Klyroo.Spreadsheet;
 
-agent.RegisterForm(form, confirmSubmit: true);
-agent.RegisterDashboard(dashboard);
+var agent = new AgentBridgeService();
 
-// Inspect choices accent-insensitively without opening any popup
-var choices = agent.Query(new AgentQueryRequest { Within = "region", Text = "Europe" });
+var form = new FormController(new FormSchema
+{
+    FormKey = "project-settings",
+    Title = "Project settings",
+    Fields =
+    [
+        new FormFieldSchema { Key = "name", Label = "Project name", DefaultValue = "Apollo" },
+        new FormFieldSchema
+        {
+            Key = "region",
+            Label = "Region",
+            Kind = FormFieldKind.Select,
+            DefaultValue = "us-east",
+            Options =
+            [
+                new FormOptionItem("us-east", "US East"),
+                new FormOptionItem("eu-west", "Europe West"),
+            ],
+        },
+    ],
+});
 
-// Execute semantic steps with policy checks & automatic secret redaction
-var result = await agent.ActAsync([
-    new AgentActStep("project name", "setValue", ["Atlas"]),
-    new AgentActStep("region", "setValue", ["eu-west"])
+agent.RegisterForm(form);
+
+foreach (var component in agent.Snapshot())
+{
+    Console.WriteLine($"{component.Ref} {component.Component} \"{component.Label}\" = {component.Value}");
+}
+// c1 input "Project name" = Apollo
+// c2 select "Region" = us-east
+// c3 form "Project settings" = clean
+
+var matches = agent.Query(new AgentQueryRequest { Within = "region", Text = "europe" });
+Console.WriteLine(matches[0].Items[0].Value); // eu-west
+
+var result = await agent.ActAsync(
+[
+    new AgentActStep("Project name", "setValue", ["Atlas"]),
+    new AgentActStep("Region", "setValue", ["eu-west"]),
 ]);
+Console.WriteLine(result.Ok ? "done" : result.Error);
 ```
 
-### Blazor Web & .NET MAUI Hybrid (`Klyroo.Agent`)
-
-```razor
-// Served automatically via _content/Klyroo.Agent/klyroo-agent.js
-const snap = window.Klyroo.agent.snapshot();
-const res  = await window.Klyroo.agent.act([
-  { ref: 'Project name', action: 'setValue', args: ['Atlas'] }
-]);
-
-// Privacy-preserving observation stream (passwords auto-masked as "[redacted]")
-const stop = window.Klyroo.agent.observe(evt => console.log(evt));
-```
+In a Blazor component, inject the scoped service instead of creating one, as shown in
+[Getting started](docs/getting-started.md).
 
 ## Documentation
 
-| Guide | Description |
+| | |
 | :--- | :--- |
-| [Online documentation](https://docs.klyroo.dev/agent) | Guides, live examples and API reference |
-| [Getting Started](./docs/getting-started.md) | Installation, DI registration, stylesheets, and first working example |
-| [Architecture](./docs/architecture.md) | Headless `.Core` vs UI split, NativeAOT guarantees, and platform matrix |
-| [API Reference](./docs/api-reference.md) | Exhaustive reference of every public class, enum, property, method, and Razor parameter |
-| [MAUI & NativeAOT](./docs/maui-and-aot.md) | `.NET MAUI Blazor Hybrid` (`iOS`, `Android`, `macOS`, `Windows`) and NativeAOT deployment |
-| [Recipes & Testing](./docs/recipes.md) | End-to-end production patterns and `xUnit` / `bUnit` testing recipes |
-| [AI Agent Skill](./skills/klyroo-agent/SKILL.md) | Machine-readable guidance for coding agents |
+| [Getting started](docs/getting-started.md) | Step-by-step first integration |
+| [Guides](docs/guides.md) | Task-oriented recipes |
+| [Concepts](docs/concepts.md) | How the library works |
+| [Platforms](docs/platforms.md) | Render modes, .NET MAUI, NativeAOT |
+| [API reference](docs/api-reference.md) | Every public type and member |
+| [FAQ](docs/faq.md) | Troubleshooting and limitations |
 
-## Key Public Types
+## Requirements
 
-| Type | Kind | Package | Summary |
-| :--- | :--- | :--- | :--- |
-| `AgentChangeSource` | `enum` | `Klyroo.Agent.Core` | Source of a component state change reported to `AgentBridgeService.Observe`. |
-| `ObservedChange` | `record` | `Klyroo.Agent.Core` | A single notification emitted by the unified `observe` change stream. |
-| `AgentComponentSnapshot` | `record` | `Klyroo.Agent.Core` | Snapshot entry describing one component on the page and the actions it currently supports. |
-| `AgentChoiceItem` | `record` | `Klyroo.Agent.Core` | One choice item returned by `AgentBridgeService.Query` for a select, filter, or list component. |
-| `AgentQueryMatch` | `record` | `Klyroo.Agent.Core` | Result entry returned by `AgentBridgeService.Query`. |
-| `AgentQueryRequest` | `class` | `Klyroo.Agent.Core` | Query parameters for `AgentBridgeService.Query`. |
-| `AgentActStep` | `record` | `Klyroo.Agent.Core` | One action step in an `AgentBridgeService.ActAsync` call. |
-| `AgentActStepOutcome` | `record` | `Klyroo.Agent.Core` | Outcome of a single step in `AgentActResult`. |
-| `AgentActResult` | `record` | `Klyroo.Agent.Core` | Result of an `AgentBridgeService.ActAsync` invocation. |
-| `AgentToolDefinition` | `record` | `Klyroo.Agent.Core` | Tool metadata and hints following the `ui-sdk.dev` Agent / WebMCP specification. |
-| `UndoStack<T>` | `class` | `Klyroo.Agent.Core` | Generic undo/redo snapshot stack inspired by `createUndoStack` from `ui-sdk.dev`. |
-| `AgentBridgeService` | `class` | `Klyroo.Agent` | Semantic Agent Bridge inspired by `ui-sdk.dev` (`createAgent`, `snapshot`, `query`, `act`, `observe`). Allows AI agents and in-app assistants to read component state, query option lists without opening popups, execute semantic actions with permission checks, and subscribe to a unified `ObservedChange` stream with automatic redaction of sensitive fields. |
-| `KlyrooAgentServiceCollectionExtensions` | `class` | `Klyroo.Agent` | Public API type |
+- .NET 10 SDK.
+- `Klyroo.Agent.Core` declares `IsAotCompatible` and `IsTrimmable`, so it works in NativeAOT and trimmed apps.
+- `Klyroo.Agent` declares `IsTrimmable` and the supported platforms `browser`, `ios`, `android`, `maccatalyst` and `windows`. It does not declare `IsAotCompatible`.
+- `AgentBridgeService` has no dependency on a render mode: it works in Static SSR, Interactive Server, WebAssembly, Auto, .NET MAUI Blazor Hybrid and non-UI hosts.
+- The browser runtime needs a browser; WebMCP registration is skipped when the browser has no `modelContext` API.
 
-## Building & Testing
+## Klyroo ecosystem
 
-```bash
-dotnet build
-dotnet test
-dotnet pack -c Release
-```
+Klyroo is a family of independent .NET libraries that compose. Each one has its own repository, versions and releases.
+
+| Library | Description |
+| :--- | :--- |
+| [Klyroo.UI](https://github.com/klyroo/klyroo-ui) | Accessible Blazor and .NET MAUI Hybrid components styled with Tailwind CSS v4 |
+| [Klyroo.Query](https://github.com/klyroo/klyroo-query) | Typed query model, URL codecs and IQueryable / EF Core execution |
+| [Klyroo.Table](https://github.com/klyroo/klyroo-table) | Data lists and trees built on Klyroo.Query |
+| [Klyroo.Form](https://github.com/klyroo/klyroo-form) | Schema-driven forms, validation and wizards |
+| [Klyroo.Dashboard](https://github.com/klyroo/klyroo-dashboard) | Analytical dashboards with filters, comparisons and KPI blocks |
+| [Klyroo.Display](https://github.com/klyroo/klyroo-display) | Read-only display blocks, media players and file preview |
+| [Klyroo.Spreadsheet](https://github.com/klyroo/klyroo-spreadsheet) | CSV and TSV import with column mapping and validation |
+| [**Klyroo.Agent**](https://github.com/klyroo/klyroo-agent) | Bridge that lets AI agents read and act on a Blazor UI |
+| [Klyroo.Stack](https://github.com/klyroo/klyroo-stack) | Meta-package, MCP server and `dotnet new` templates |
 
 ## Contributing
 
-Issues and pull requests are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow (Conventional
-Commits, tests, documentation), follow the [Code of Conduct](./CODE_OF_CONDUCT.md), and report vulnerabilities
-privately as described in [SECURITY.md](./SECURITY.md).
-
-## Migrating from Lux
-
-This library was previously named `lux-agent`. [MIGRATION.md](./MIGRATION.md) lists every renamed package, namespace,
-component, CSS token and build setting.
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and follow the
+[code of conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT — see [LICENSE](./LICENSE). Part of the **[Klyroo](../klyroo-stack/README.md)** ecosystem.
+[MIT](LICENSE)

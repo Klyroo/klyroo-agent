@@ -7,15 +7,17 @@ tests, versions and releases, so a change usually belongs to exactly one of them
 ## Prerequisites
 
 - **.NET SDK 10** (`global.json` pins the feature band and rolls forward). Install from [dot.net](https://dot.net).
-- **Node.js 22** for the JavaScript assets (`npm ci` then `npm run build` regenerates what is committed under `wwwroot`).
-- Some projects reference sibling Klyroo repositories by relative path (`../klyroo-ui`, ...). Clone the
+- **Node.js** is optional. The JavaScript assets under `src/Klyroo.Agent/wwwroot` are plain ES modules that are edited by hand and must stay identical to `packages/agent/index.js` and `packages/behaviors/index.js`.
+- Some projects reference sibling Klyroo repositories by relative path (`../klyroo-form`, ...). Clone the
   repositories you need next to each other:
 
   ```bash
   mkdir klyroo && cd klyroo
   git clone https://github.com/klyroo/klyroo-agent.git
-  # plus the siblings it references, for example:
-  git clone https://github.com/klyroo/klyroo-ui.git
+  # plus the siblings it references:
+  git clone https://github.com/klyroo/klyroo-form.git
+  git clone https://github.com/klyroo/klyroo-dashboard.git
+  git clone https://github.com/klyroo/klyroo-spreadsheet.git
   ```
 
 ## Build, test, format

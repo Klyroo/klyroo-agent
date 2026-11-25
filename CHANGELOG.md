@@ -1,21 +1,24 @@
 # Changelog
 
-All notable changes to **klyroo-agent** are documented in this file.
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
 
 ## [0.1.0-preview.1] - 2026-11-24
 
-### Changed
-- **BREAKING:** the project joins the Klyroo ecosystem. Packages, namespaces, types, components (`Lx*` to `Kly*`),
-  CSS tokens (`--lux-*` to `--klyroo-*`), MSBuild properties and diagnostics are renamed. See
-  [MIGRATION.md](./MIGRATION.md).
-- Klyroo visual identity: Klyroo Lime (`#b6ff00`) on Charcoal (`#0b0f14`) as the default primary palette.
-
 ### Added
-- Initial preview release on `.NET 10`: Semantic AI Agent Bridge (snapshot, query, act, observe), [redacted] secret masking, AllowPolicy gates, UndoStack<T>, WebMCP & 12 DOM behaviors.
-- Clean two-layer architecture (`*.Core` 100% Headless / NativeAOT + multiplatform Blazor Web & .NET MAUI Blazor Hybrid UI).
-- Comprehensive xUnit / bUnit / EF Core SQLite test suite and GitHub Actions CI/Release NuGet pipelines.
-- Full English documentation, cross-library integration guides, and interactive live examples at https://klyroo.dev.
-- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `.editorconfig`, issue and pull request templates,
-  Dependabot configuration.
-- Release workflow with version/tag check, NuGet metadata verification, Trusted Publishing (OIDC), an approval gate
-  (`nuget` environment) and GitHub Release notes taken from this changelog.
+
+- `AgentBridgeService` with `Snapshot`, `Query` and `ActAsync`: list registered components with stable references, list the choices of a select or filter without opening a popup, and run named actions by reference or label, stopping at the first failing step.
+- Registration of Klyroo.Form forms (including stepped forms), Klyroo.Dashboard dashboards and Klyroo.Spreadsheet importers with `RegisterForm`, `RegisterDashboard` and `RegisterSpreadsheet`.
+- Permission gating with `AllowPolicy`, a per-call `allow` callback and confirmation-required forms.
+- Redaction of password and one-time-code values in snapshots, results and observed changes.
+- `Observe` change stream delivering an `ObservedChange` for each successful step, and `GetToolDefinitions` describing the `snapshot`, `query` and `act` tools with read-only and consequential hints.
+- `AddKlyrooAgent()` dependency injection registration (scoped).
+- `UndoStack<T>`, a bounded undo and redo history, in the dependency-free, NativeAOT-compatible `Klyroo.Agent.Core` package.
+- Browser runtime `klyroo-agent.js` (snapshot, query, act, observe and WebMCP registration) and the `klyroo-behaviors.js` helper module, shipped as static web assets of `Klyroo.Agent`.
+
+[Unreleased]: https://github.com/klyroo/klyroo-agent/compare/v0.1.0-preview.1...HEAD
+[0.1.0-preview.1]: https://github.com/klyroo/klyroo-agent/releases/tag/v0.1.0-preview.1
