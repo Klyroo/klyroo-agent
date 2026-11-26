@@ -26,6 +26,11 @@ dashboard filter with `Enabled` set to false. Change the state that disables it 
 Each component only accepts the actions listed in its snapshot entry. A plain field has no
 `toggle`, and only stepped forms have `nextStep`. Read `Actions` from `Snapshot`.
 
+**A step fails with `failed: the application reported an error`**
+
+The action threw. The text of the exception is not given to the model, because it can hold a path or a connection string. Set
+`AgentBridgeService.Logger` to read the exception, for example `agent.Logger = loggerFactory.CreateLogger("agent")`.
+
 **A step fails with `returned false`**
 
 The controller ran the action and declined. Typical causes are a `submit` or `nextStep` on a form that fails
@@ -52,7 +57,7 @@ approves them to get the old behavior. See [Require approval before consequentia
 **`Snapshot` is missing components**
 
 `Snapshot` returns at most 100 components. Stateless form fields (`Info`, `Divider`, `Section`, `Button`) are never
-registered, `Hidden` form fields are never registered, fields that are not in effect (condition false, hidden container, tab or section, skipped step) are left out, and fields of another step appear only with `includeOffPage`. Dashboard filters marked headless are skipped.
+registered, hidden inputs are never registered, fields that are not in effect (condition false, hidden container, tab or section, skipped step) are left out, and fields of another step appear only with `includeOffPage`. Dashboard filters marked headless are skipped.
 
 **An observer does not fire when a user edits a field**
 
@@ -69,8 +74,8 @@ Static web assets are served automatically in development. In a published app, m
 - `ActAsync` has no rollback: a failing step leaves earlier steps applied.
 - The bridge never reads password or one-time-code values, but it does not detect other kinds of secrets. Redaction is
   by field kind.
-- Only Klyroo.Form, Klyroo.Dashboard and Klyroo.Spreadsheet controllers can be registered. Any other source of state
-  needs its own adapter in your code.
+- Only Klyroo.Form (anything that implements `IFormRuntime`), Klyroo.Dashboard and Klyroo.Spreadsheet controllers can be
+  registered. Any other source of state needs its own adapter in your code.
 - `AgentChangeSource` has seven values, but the .NET bridge only ever reports `Agent`.
 - The service is not thread safe.
 - The browser runtime and `AgentBridgeService` are independent: references (`c1`) from one are not valid in the other.

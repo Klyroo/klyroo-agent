@@ -7,7 +7,7 @@ namespace Klyroo.Agent;
 /// One argument of an <see cref="AgentActStep"/>: text, a number, a boolean, <c>null</c> or a list of those, held as the
 /// JSON value a language model sent. A .NET caller writes it as a plain value, because the conversions below
 /// create the JSON: <c>new AgentActStep("Quantity", "setValue", [12])</c>. A number keeps its exact digits, so a
-/// <see cref="long"/> or a <see cref="decimal"/> reaches a field as the digits given. An object is not an argument the
+/// 64-bit integer or a decimal reaches a field as the digits given. An object is not an argument the
 /// bridge accepts: <c>AgentBridgeService.ActAsync</c> fails the step.
 /// </summary>
 public readonly struct AgentArgument : IEquatable<AgentArgument>

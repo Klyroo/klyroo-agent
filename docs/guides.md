@@ -1,7 +1,7 @@
 # Guides
 
 Task-oriented recipes. Each one assumes the bridge is registered as shown in [Getting started](getting-started.md).
-Samples use `agent` for an `AgentBridgeService` and `form` for a `FormController` that is already registered.
+Samples use `agent` for an `AgentBridgeService` and `form` for a `FormController<TModel>` (or a `DynamicFormController`) that is already registered.
 
 - [Require approval before consequential actions](#require-approval-before-consequential-actions)
 - [Drive a multi-step wizard](#drive-a-multi-step-wizard)
@@ -53,30 +53,18 @@ Goal: let an agent fill a stepped form and move between its steps.
 
 A form built from `Steps` exposes `nextStep` and `previousStep` on the form component. Fields of the current step
 are listed; fields of another step that is in effect appear only with `Snapshot(includeOffPage: true)`, flagged `OffPage`.
-A field that is not in effect, because its `Condition` is false, its container or tab is hidden, or its step is skipped, is
-absent and refuses every step, and `Hidden` fields are never exposed.
+A field that is not in effect, because its `VisibleWhen` condition is false (`Condition` on a dynamic schema), its container or tab is hidden, or its step is skipped, is
+absent and refuses every step, a disabled field refuses every step too, and hidden inputs are never exposed.
 
 ```csharp
-var wizard = new FormController(new FormSchema
+var schema = FormSchema.For<Onboarding>(s =>
 {
-    FormKey = "onboarding",
-    Title = "Onboarding",
-    Steps =
-    [
-        new FormStepSchema
-        {
-            Key = "account",
-            Title = "Account",
-            Fields = [new FormFieldSchema { Key = "org", Label = "Organization" }],
-        },
-        new FormStepSchema
-        {
-            Key = "confirm",
-            Title = "Confirm",
-            Fields = [new FormFieldSchema { Key = "ok", Label = "Accepted", Kind = FormFieldKind.Checkbox }],
-        },
-    ],
+    s.FormKey = "onboarding";
+    s.Title = "Onboarding";
+    s.Step("account", "Account", st => st.Field(o => o.Org, f => f.Label("Organization")));
+    s.Step("confirm", "Confirm", st => st.Field(o => o.Accepted, f => f.Label("Accepted")));
 });
+var wizard = new FormController<Onboarding>(schema, new Onboarding());
 agent.RegisterForm(wizard);
 
 var result = await agent.ActAsync(
@@ -86,6 +74,13 @@ var result = await agent.ActAsync(
     new AgentActStep("Accepted", "toggle"),
     new AgentActStep("Onboarding", "submit"),
 ]);
+
+public sealed class Onboarding
+{
+    public string Org { get; set; } = "";
+
+    public bool Accepted { get; set; }
+}
 ```
 
 `nextStep` and `submit` return `false` when the form refuses them, for example because a required field is empty.
@@ -135,38 +130,43 @@ The agent cannot load a file. Load it in your code and register the importer:
 ```csharp
 using Klyroo.Spreadsheet;
 
-var importer = new SpreadsheetImporter(new SpreadsheetSchema
+var importer = new SpreadsheetImporter<Contact>(SpreadsheetSchema.For<Contact>(s =>
 {
-    Key = "contacts-import",
-    Columns =
-    [
-        new SpreadsheetColumnSchema { Key = "name", Label = "Name", Required = true },
-        new SpreadsheetColumnSchema
-        {
-            Key = "team", Label = "Team", Kind = SpreadsheetColumnKind.Select,
-            Options = [new("eng", "Engineering"), new("ops", "Operations")],
-        },
-    ],
-    OnSubmit = rows => Task.FromResult<IReadOnlyList<SpreadsheetRejectedRow>?>([]),
-});
+    s.Key = "contacts-import";
+    s.OnSubmit = rows => Task.FromResult<IReadOnlyList<SpreadsheetRejectedRow>?>([]);
+    s.Column(r => r.Name, c => c.Key("name").Label("Name").Required());
+    s.Column(r => r.Team, c => c.Key("team").Label("Team")
+        .Options([new SpreadsheetOption<string?>("eng", "Engineering"), new SpreadsheetOption<string?>("ops", "Operations")]));
+}));
 importer.LoadText("Full name;Team\nAlice;Engineering\nBob;Devops", "contacts.csv");
 agent.RegisterSpreadsheet(importer);
 agent.AllowPolicy = async (step, confirm) => !confirm || await AskUserAsync(step); // submit and clearFile need confirmation
+
+public sealed class Contact
+{
+    public string? Name { get; set; }
+
+    public string? Team { get; set; }
+}
 ```
+
+The agent addresses a column by its key or its label. The key of a typed column is the name of the property (`Name`)
+unless you call `Key("name")`, as above; the `cells` of a row record and the `field` of an issue use the same key.
 
 The snapshot value is a summary, not the rows. Read it first, then page through what you need:
 
 ```csharp
 var sheet = agent.Snapshot().First(c => c.Component == "spreadsheet");
-var summary = (AgentSpreadsheetSummary)sheet.Value!;
+var summary = (AgentSpreadsheetSummary)sheet.Value!; // the value is an AgentValue; a spreadsheet's is this summary
 // summary.Step, summary.Rows, summary.InvalidRows, summary.OpenQuestions, summary.UnmappedRequiredColumns, summary.CanSubmit
 
 var rows = agent.Query(new AgentQueryRequest { Within = "contacts-import", Collection = "rows", Filter = "invalid", Limit = 25 });
-// rows[0].Records: rowNumber, status, cells, issues; rows[0].Total tells whether to ask for the next page with Offset
+// rows[0].Records holds AgentRowRecord (RowNumber, Status, Cells, Issues); rows[0].Total tells whether to ask for the next page with Offset
 ```
 
-The collections are `rows` (filter `importable`, `invalid`, `discarded`), `issues` (`blocking`, `warnings`), `columns`,
-`headers` and `questions` (`open`). Then act. Rows are addressed by the row number the user sees in the file, which is
+The collections are `rows` (filter `importable`, `invalid`, `discarded`; records are `AgentRowRecord`), `issues` (`blocking`,
+`warnings`; `AgentIssueRecord`), `columns` (`AgentColumnRecord`), `headers` (`AgentHeaderRecord`) and `questions` (`open`;
+`AgentQuestionRecord`). Then act. Rows are addressed by the row number the user sees in the file, which is
 the `rowNumber` of a record, so with a header on row 1 the first data row is row 2:
 
 ```csharp
@@ -206,21 +206,26 @@ foreach (var tool in AgentBridgeService.GetToolDefinitions())
 }
 
 // toolName and arguments come from the model's tool call.
-object result = await agent.InvokeToolAsync(toolName, arguments);
-// snapshot: IReadOnlyList<AgentComponentSnapshot>; query: IReadOnlyList<AgentQueryMatch>;
-// act: AgentActResult; a malformed call or an unknown tool: AgentToolError (a value, not an exception).
+AgentToolResult result = await agent.InvokeToolAsync(toolName, arguments);
+switch (result)
+{
+    case AgentSnapshotResult snapshot: /* snapshot.Components */ break;
+    case AgentQueryResult query: /* query.Matches */ break;
+    case AgentActResult act: /* act.Ok, act.Steps, act.Values, act.Error */ break;
+    case AgentToolError error: /* a malformed call or an unknown tool: a value, not an exception */ break;
+}
 ```
 
 Pass the arguments as the `JsonElement` the host gives you. Do not turn each one into text: a number must stay a number
-and a list must stay a list, because the form coercion reads them as typed JSON. If you build the steps yourself, keep the
-raw elements, and `ActAsync` unwraps them:
+and a list must stay a list, because the codec of a form field reads them as typed JSON. If you build the steps yourself,
+wrap the raw elements in `AgentArgument`:
 
 ```csharp
 var steps = args.GetProperty("steps").EnumerateArray()
     .Select(s => new AgentActStep(
         s.GetProperty("ref").GetString()!,
         s.GetProperty("action").GetString()!,
-        s.TryGetProperty("args", out var a) ? a.EnumerateArray().Select(x => (object?)x.Clone()).ToList() : null))
+        s.TryGetProperty("args", out var a) ? a.EnumerateArray().Select(x => new AgentArgument(x)).ToList() : null))
     .ToList();
 var outcome = await agent.ActAsync(steps);
 ```
@@ -372,7 +377,7 @@ Goal: keep an audit trail of agent edits.
 
 ```csharp
 using var subscription = agent.Observe(change =>
-    Console.WriteLine($"{change.Label}: {change.Previous} -> {change.Value} ({change.Reason})"));
+    Console.WriteLine($"{change.Label}: {change.Previous?.ToDisplayString()} -> {change.Value?.ToDisplayString()} ({change.Reason})"));
 ```
 
 Password and one-time-code values reach the callback as `[redacted]`. Only changes made through `ActAsync` are
@@ -445,12 +450,13 @@ public sealed class AgentBridgeTests
     [Fact]
     public async Task Agent_can_set_a_value_and_a_denied_submit_changes_nothing()
     {
-        var form = new FormController(new FormSchema
+        var schema = FormSchema.For<Project>(s =>
         {
-            FormKey = "project-settings",
-            Title = "Project settings",
-            Fields = [new FormFieldSchema { Key = "name", Label = "Project name", DefaultValue = "Apollo" }],
+            s.FormKey = "project-settings";
+            s.Title = "Project settings";
+            s.Field(p => p.Name, f => f.Label("Project name"));
         });
+        var form = new FormController<Project>(schema, new Project());
         var agent = new AgentBridgeService
         {
             AllowPolicy = (_, confirmRequired) => Task.FromResult(!confirmRequired),
@@ -461,10 +467,15 @@ public sealed class AgentBridgeTests
         var submit = await agent.ActAsync([new AgentActStep("Project settings", "submit")]);
 
         Assert.True(edit.Ok);
-        Assert.Equal("Atlas", form.GetValue<string>("name"));
+        Assert.Equal("Atlas", form.Get(schema.Field(p => p.Name)));
         Assert.False(submit.Ok);
         Assert.Contains("refused by policy", submit.Error);
     }
+}
+
+public sealed class Project
+{
+    public string Name { get; set; } = "Apollo";
 }
 ```
 

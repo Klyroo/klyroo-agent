@@ -16,12 +16,12 @@ in a console app.
 - **Snapshot**: lists every registered component with a stable reference (`c1`, `c2`, ...), its label, current value and the actions it accepts, capped at 100 entries.
 - **Query**: lists the choices of a select or filter, filtered by text, without opening a popup. Matching ignores case and accents.
 - **Act**: runs named actions (`setValue`, `toggle`, `clear`, `reset`, `submit`, `nextStep`, `setView`, `refresh`, and the spreadsheet actions `assignColumn`, `answerValue`, `editCell`, `discardRows` and more) by reference or label, stops at the first failing step and reports why.
-- **Typed values**: `setValue` on a form field coerces what a model sends (JSON numbers, text, lists) to the type of the field kind and refuses a select value that is not an option, with the reason.
+- **Typed values**: values, step arguments, query records and tool results are typed (`AgentValue`, `AgentArgument`, `AgentRecord`, `AgentToolResult`), with no `object` in the public API. `setValue` on a form field is read by the codec of the field in `Klyroo.Form` (JSON numbers keep their digits, text, lists, option labels) and refused with the reason when it does not fit the type of the member.
 - **Permission gate**: `AllowPolicy` and a per-call `allow` callback can refuse any step. Steps that need confirmation (forms, which are registered with `confirmSubmit: true` by default, a spreadsheet `submit` or `clearFile`) are refused when no policy is set.
 - **Spreadsheet imports**: the snapshot value is a summary (step, counts, open questions, unmapped required columns) and `Query` pages through rows and issues, addressed by the row number the user sees.
 - **Secret redaction**: password and one-time-code fields appear as `[redacted]` in snapshots, results and observed changes.
 - **Observe**: `Observe` delivers one `ObservedChange` per successful step, with the previous and new value.
-- **Tool definitions**: `GetToolDefinitions` returns the `snapshot`, `query` and `act` tool descriptions, with read-only and consequential hints and the JSON schema of the arguments, and `InvokeToolAsync` runs a call from its raw JSON arguments.
+- **Tool definitions**: `GetToolDefinitions` returns the `snapshot`, `query` and `act` tool descriptions, with read-only and consequential hints and the JSON schema of the arguments, and `InvokeToolAsync` runs a call from its raw JSON arguments and returns an `AgentToolResult`.
 - **Microsoft.Extensions.AI**: `Klyroo.Agent.AI` turns the bridge into `AIFunction` instances for any `IChatClient`, with an approval step for confirmation-required actions.
 - **Browser runtime**: a separate JavaScript module (`klyroo-agent.js`) offers the same three operations over the DOM and can register them with WebMCP when the browser provides it.
 
@@ -29,7 +29,7 @@ in a console app.
 
 | Package | Description |
 | :--- | :--- |
-| [`Klyroo.Agent.Core`](https://www.nuget.org/packages/Klyroo.Agent.Core) | The data types of the bridge (`AgentActStep`, `AgentActResult`, `ObservedChange`, ...) and `UndoStack<T>`. No dependencies, NativeAOT compatible. |
+| [`Klyroo.Agent.Core`](https://www.nuget.org/packages/Klyroo.Agent.Core) | The data types of the bridge (`AgentActStep`, `AgentArgument`, `AgentValue`, `AgentActResult`, `AgentToolResult`, `ObservedChange`, ...) and `UndoStack<T>`. No dependencies, NativeAOT compatible. |
 | [`Klyroo.Agent`](https://www.nuget.org/packages/Klyroo.Agent) | `AgentBridgeService`, `AddKlyrooAgent()`, and the browser runtime served from `_content/Klyroo.Agent/`. Depends on `Klyroo.Agent.Core`, `Klyroo.Form.Core`, `Klyroo.Dashboard.Core` and `Klyroo.Spreadsheet.Core`. |
 | [`Klyroo.Agent.AI`](https://www.nuget.org/packages/Klyroo.Agent.AI) | `AsAIFunctions()`: the bridge as `Microsoft.Extensions.AI` functions, with approval for confirmation-required actions. Depends on `Klyroo.Agent` and `Microsoft.Extensions.AI.Abstractions`. |
 | [`@klyroo/agent`](https://github.com/klyroo/klyroo-agent/blob/main/packages/agent/README.md) | Source of the browser runtime (npm package manifest). Not published to npm; the same file ships inside `Klyroo.Agent`. |
@@ -39,7 +39,7 @@ in a console app.
 To use the library in an app:
 
 - **The .NET 10 SDK**, and an app that targets `net10.0`. The packages are prereleases, so every `dotnet add package` command needs `--prerelease`.
-- **The controllers you expose**: `Klyroo.Agent` references the `Klyroo.Form.Core`, `Klyroo.Dashboard.Core` and `Klyroo.Spreadsheet.Core` packages, so the bridge works with any app that builds a `FormController`, `DashboardController` or `SpreadsheetImporter`, rendered or not. Register it with `AddKlyrooAgent()`.
+- **The controllers you expose**: `Klyroo.Agent` references the `Klyroo.Form.Core`, `Klyroo.Dashboard.Core` and `Klyroo.Spreadsheet.Core` packages, so the bridge works with any app that builds a `FormController<TModel>` (or a `DynamicFormController`), a `DashboardController` or a `SpreadsheetImporter<TRow>`, rendered or not. Register it with `AddKlyrooAgent()`.
 - **An AI host that calls your code**: the bridge exposes `snapshot`, `query` and `act` as methods and tool definitions; your MCP server, chat endpoint or tool loop calls them. The library does not call a model itself.
 - **For the browser runtime** (`klyroo-agent.js`): a browser with ES modules, the static web assets of the app served (`MapStaticAssets` or `UseStaticFiles`), and, for `registerWebMcp`, a browser that exposes the WebMCP `modelContext` API, which is still experimental.
 
@@ -72,33 +72,24 @@ using Klyroo.Form;
 
 var agent = new AgentBridgeService();
 
-var form = new FormController(new FormSchema
+var schema = FormSchema.For<Project>(s =>
 {
-    FormKey = "project-settings",
-    Title = "Project settings",
-    Fields =
+    s.FormKey = "project-settings";
+    s.Title = "Project settings";
+    s.Field(p => p.Name, f => f.Label("Project name"));
+    s.Field(p => p.Region, f => f.Options(
     [
-        new FormFieldSchema { Key = "name", Label = "Project name", DefaultValue = "Apollo" },
-        new FormFieldSchema
-        {
-            Key = "region",
-            Label = "Region",
-            Kind = FormFieldKind.Select,
-            DefaultValue = "us-east",
-            Options =
-            [
-                new FormOptionItem("us-east", "US East"),
-                new FormOptionItem("eu-west", "Europe West"),
-            ],
-        },
-    ],
+        new FormOption<string>("us-east", "US East"),
+        new FormOption<string>("eu-west", "Europe West"),
+    ]));
 });
+var form = new FormController<Project>(schema, new Project());
 
 agent.RegisterForm(form);
 
 foreach (var component in agent.Snapshot())
 {
-    Console.WriteLine($"{component.Ref} {component.Component} \"{component.Label}\" = {component.Value}");
+    Console.WriteLine($"{component.Ref} {component.Component} \"{component.Label}\" = {component.Value?.ToDisplayString()}");
 }
 // c1 input "Project name" = Apollo
 // c2 select "Region" = us-east
@@ -113,6 +104,14 @@ var result = await agent.ActAsync(
     new AgentActStep("Region", "setValue", ["eu-west"]),
 ]);
 Console.WriteLine(result.Ok ? "done" : result.Error);
+Console.WriteLine(form.Get(schema.Field(p => p.Name))); // Atlas
+
+public sealed class Project
+{
+    public string Name { get; set; } = "Apollo";
+
+    public string Region { get; set; } = "us-east";
+}
 ```
 
 In a Blazor component, inject the scoped service instead of creating one, as shown in

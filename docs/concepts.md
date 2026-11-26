@@ -7,13 +7,15 @@ An agent needs three things from a UI: to know what is there, to know what it ca
 components. A component is not a rendered element. It is a small record the bridge builds from a controller:
 
 ```text
- Klyroo.Form      FormController        --RegisterForm-------+
- Klyroo.Dashboard DashboardController   --RegisterDashboard--+--> AgentBridgeService
- Klyroo.Spreadsheet SpreadsheetImporter --RegisterSpreadsheet-+        |
-                                                                       +-- Snapshot() -> AgentComponentSnapshot[]
- your tool handler / assistant / MCP server --------------------------+-- Query()    -> AgentQueryMatch[]
-                                                                       +-- ActAsync() -> AgentActResult
-                                                                       +-- Observe()  -> ObservedChange
+ Klyroo.Form      IFormRuntime            --RegisterForm-------+
+   (FormController<TModel>, DynamicFormController)                |
+ Klyroo.Dashboard DashboardController     --RegisterDashboard--+--> AgentBridgeService
+ Klyroo.Spreadsheet SpreadsheetImporter   --RegisterSpreadsheet-+        |
+                                                                         +-- Snapshot() -> AgentComponentSnapshot[]
+ your tool handler / assistant / MCP server ----------------------------+-- Query()    -> AgentQueryMatch[]
+                                                                         +-- ActAsync() -> AgentActResult
+                                                                         +-- Observe()  -> ObservedChange
+                                                                         +-- InvokeToolAsync() -> AgentToolResult
 ```
 
 Each registered component has a reference, a kind, a label, a value getter, a list of action names, an optional
@@ -22,7 +24,7 @@ gets and which actions it offers:
 
 | Registered object | Components created | Actions |
 | :--- | :--- | :--- |
-| Form field | `select` (Select, AutoComplete, Radio), `checkbox` (Checkbox, Switch), `number` (Number, Slider), otherwise `input` | `setValue`, `clear`, `reset`; checkboxes offer `toggle`, `setValue`, `clear` (stores `false`), `reset` |
+| Form field of an `IFormRuntime` | `select` (Select, AutoComplete, Radio), `checkbox` (Checkbox, Switch), `number` (Number, Slider), otherwise `input` | `setValue`, `clear`, `reset`; checkboxes offer `toggle`, `setValue`, `clear` (stores `false`), `reset` |
 | Hidden form fields | none | never registered: the agent can neither read nor write them |
 | The form | `form` | `submit`, `reset`; stepped forms also `nextStep`, `previousStep` |
 | Dashboard filter | `select` | `setValue`, `reset`; multiple filters also `toggle`, `clear` |
@@ -40,7 +42,8 @@ first check that fails:
 1. **Find the target.** The step's `Ref` is matched against component references first, then against labels
    ignoring case, accents and repeated whitespace. No match is an error. A label shared by several components is also an
    error, which lists the references so the caller can retry with one.
-2. **Check state.** A component whose disabled check returns true rejects the step.
+2. **Check state.** A component whose disabled check returns true rejects the step. The form engine itself writes to a disabled
+   field when asked, so this check is what keeps an agent out of it.
 3. **Check the action.** The action name must be in the component's action list.
 4. **Ask the policy.** A step that needs confirmation is refused when neither `AllowPolicy` nor an `allow` callback is
    set. Otherwise the `allow` callback passed to the call runs first, then `AllowPolicy`, and either returning `false`
@@ -51,14 +54,17 @@ first check that fails:
    `ObservedChange` is delivered to subscribers.
 
 A form field that is not in effect refuses every step and is absent from `Snapshot` and `Query`. "In effect" is the rule
-`FormController.ActiveFields` applies to the form output: the field's condition is true, its containers, tab and section
+`IFormFieldAccess.IsHidden` reports, the rule `ActiveFields` applies to the form output: the field's condition is true, its containers, tab and section
 are visible, and its step is the current one or is not skipped. A field of another step that is in effect is listed only by
 `Snapshot(includeOffPage: true)`, flagged `OffPage`, and `Query` leaves it out. A call carries at most
 `AgentBridgeService.MaxStepsPerAct` (50) steps; a longer list fails before any step runs.
 
 Failures are values, not exceptions: you get `Ok = false` and an `Error` message that names the step number, the
 component and the reason, including when the action throws (a failing `OnSubmit`, for example). That makes the message safe to return to a language model as a tool result so it can
-correct itself. There is no rollback. If step 3 of 5 fails, steps 1 and 2 stay applied and 4 and 5 never run.
+correct itself. The text of an exception that an action throws is never part of it, because it can hold a path, a query or a connection string:
+the model reads `failed: the application reported an error`, and the exception goes to `AgentBridgeService.Logger`. A spreadsheet `submit`
+follows the importer: after an ordinary exception the step reports the submit status, and a `SpreadsheetUserMessageException` is the way to give
+the uploader (and the model) a message. There is no rollback. If step 3 of 5 fails, steps 1 and 2 stay applied and 4 and 5 never run.
 
 ## Confirmation and policy
 
@@ -72,13 +78,29 @@ With no `AllowPolicy` and no `allow` callback, a step that needs confirmation is
 no AllowPolicy is set`, and every other step runs. This is the safe default: an agent cannot submit or clear anything
 until you decide how it is approved. The library never opens a dialog, it only asks a function.
 
-## Values the model sends
+## Values and arguments
 
-A model delivers arguments as JSON, so numbers, booleans and lists arrive as `JsonElement` and often as text. `ActAsync`
-unwraps them once: a JSON number becomes a `long` when the token is an integer in range, a `decimal` when that reproduces the
-token exactly (`1.50` stays `1.50`), and otherwise keeps its digits as sent. Text fields and spreadsheet cells therefore get
-the exact digits (`12345678901234567890` stays that text), numeric fields store a `double`, and a whole number written
-`25.0` counts as an integer. Then and a form `setValue` then coerces the value to what the field kind stores, with the invariant
+Everything the bridge reports or accepts has a type; no public member is an `object`.
+
+- **What the bridge reports** is an `AgentValue`: `AgentTextValue`, `AgentNumberValue` (the digits as the component reports them,
+  so a 64-bit integer or a 28-digit decimal is not rounded; `Approximate` and `Exact` convert it), `AgentBooleanValue`,
+  `AgentListValue` or, for a spreadsheet, `AgentSpreadsheetSummary`. No value at all is `null`. It is the `Value` of a snapshot entry, a
+  step outcome and an observed change (`Previous` and `Value`), and the entries of `AgentActResult.Values`. It serializes to
+  the JSON an agent reads (a string, a number, a boolean, an array or the summary object); `ToDisplayString()` gives a short
+  text for a label or a log.
+- **What an agent sends** is a list of `AgentArgument` in `AgentActStep.Args`: a struct over the JSON value. Text, `bool`, `int`,
+  `long`, `decimal`, `double` and `string[]` convert to it, `AgentArgument.List(...)` builds a list, and `new AgentArgument(element)`
+  wraps a `JsonElement` from a tool call. A number keeps its digits (`1.50` stays `1.50`, `long.MaxValue` stays that number).
+  An object is not an argument: the step fails with `An object is not a valid value`.
+- **What a query returns** are `AgentRecord` subtypes: `AgentRowRecord`, `AgentIssueRecord`, `AgentColumnRecord`,
+  `AgentHeaderRecord` and `AgentQuestionRecord`.
+- **What a tool call returns** is an `AgentToolResult`: `AgentSnapshotResult`, `AgentQueryResult`, `AgentActResult` or `AgentToolError`.
+
+A model delivers arguments as JSON, so numbers, booleans and lists arrive as `JsonElement` and often as text. A form field reads
+the argument itself: `setValue` calls `IFormFieldAccess.TrySet(JsonElement)`, which is implemented by the codec of the field in
+`Klyroo.Form`, and the bridge only passes the result on. For a typed `FormController<TModel>` the stored value has the type of the
+member, so a `long` member takes `9223372036854775807` exactly and refuses `2.5`, a `decimal` keeps all its digits, and an
+`int` member refuses a value out of its range. For a `DynamicFormController` the field kind decides, with the invariant
 culture:
 
 | Field kind | Stored value | Accepted from the model |
@@ -96,19 +118,21 @@ culture:
 | Tag | list of text | a list of text, trimmed and de-duplicated |
 | ArrayList, ArrayTable, containers | none | refused: `setValue` cannot edit a repeatable list |
 
-A value that does not fit fails the step with the reason and leaves the form untouched, so the model can correct
-itself. An empty value (`null` or `""`) clears a text, number, date or single choice field, and empties a multiple choice.
-The `clear` action stores the empty value of the kind: `false` for a checkbox or switch, an empty list for tags and
-multiple choices, `null` elsewhere. `reset` restores the schema default through the form. A dashboard `setView` fails
-when the key is not an enabled view.
+The rules live in `Klyroo.Form`, with their tests; the bridge no longer has its own copy. A value that does not fit fails the step
+with the reason and leaves the form untouched, so the model can correct itself. An empty value (`null` or `""`) clears a text,
+number, date or single choice field, and empties a multiple choice. The `clear` action stores the empty value of the kind: `false`
+for a checkbox or switch, an empty list for tags and multiple choices, `null` elsewhere. `reset` restores the schema default
+through the form. A dashboard `setView` fails when the key is not an enabled view.
 
 ## Spreadsheet imports
 
-The snapshot value of a spreadsheet is an `AgentSpreadsheetSummary`: the wizard step, the counts of rows, importable,
+The snapshot value of a spreadsheet is an `AgentSpreadsheetSummary` (an `AgentValue`): the wizard step, the counts of rows, importable,
 invalid, discarded and warning rows, the number of open questions, the required columns no file column matches, and the
 submit state. It carries no rows, so a large file does not flood the model. To read rows, use `Query` with `Within`
 set to the importer and `Collection` set to `rows`, `issues`, `columns`, `headers` or `questions`, with `Offset`, `Limit`
 (25 by default, 100 at most), `Filter` and `Text`.
+
+The columns are the keys of the typed schema: the property name (`Name`) unless the column calls `Key("name")`; `assignColumn`, `ignoreColumn`, `editCell` and `answerValue` take a key or a label, and the `cells` of a row record are keyed by it.
 
 Rows are addressed by the row number the user sees in the file, the `rowNumber` of a row record, for `editCell`,
 `discardRows` and `restoreRows`. The header is usually row 1, so the first data row is row 2. Internal indexes never
@@ -124,7 +148,7 @@ a secret is not redacted.
 
 ## Two packages
 
-`Klyroo.Agent.Core` holds the vocabulary: the records and enums that describe snapshots, queries, steps, results and
+`Klyroo.Agent.Core` holds the vocabulary: the records and enums that describe snapshots, values, queries, steps, results and
 observed changes, plus `UndoStack<T>`. It has no dependencies and is declared NativeAOT compatible, so it fits in a
 contract library shared between a server and a client, or in a trimmed app that only needs the types.
 

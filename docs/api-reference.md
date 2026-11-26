@@ -1,10 +1,10 @@
-# Klyroo.Agent API reference
+# Klyroo.Agent API reference API reference
 
 > Generated from the compiled assemblies and their XML documentation. Do not edit by hand.
 
 ## Klyroo.Agent.Core
 
-Classes (2) · Records (10) · Enums (1)
+Classes (2) · Records (25) · Structs (1) · Enums (1)
 
 ### Classes
 
@@ -55,20 +55,20 @@ A bounded undo and redo history of immutable snapshots. It is independent of the
 
 #### `AgentActResult`
 
-`Klyroo.Agent` · record
+`Klyroo.Agent` · record · inherits `AgentToolResult`
 
 The result of `AgentBridgeService.ActAsync`. Steps run in order and the first failure stops the run, so `Steps` only lists the steps that succeeded before it. Earlier steps are not rolled back.
 
 | Constructor | Description |
 | :--- | :--- |
-| `AgentActResult(bool Ok, IReadOnlyList<AgentActStepOutcome> Steps, IReadOnlyDictionary<string, object?> Values, string? Error = null)` | The result of `AgentBridgeService.ActAsync`. Steps run in order and the first failure stops the run, so `Steps` only lists the steps that succeeded before it. Earlier steps are not rolled back. |
+| `AgentActResult(bool Ok, IReadOnlyList<AgentActStepOutcome> Steps, IReadOnlyDictionary<string, AgentValue?> Values, string? Error = null)` | The result of `AgentBridgeService.ActAsync`. Steps run in order and the first failure stops the run, so `Steps` only lists the steps that succeeded before it. Earlier steps are not rolled back. |
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | `Error` (init) | `string?` | A message naming the failing step and the reason, or `null` on success. |
 | `Ok` (init) | `bool` | Whether every step succeeded. |
 | `Steps` (init) | `IReadOnlyList<AgentActStepOutcome>` | The steps that succeeded. |
-| `Values` (init) | `IReadOnlyDictionary<string, object?>` | The latest value of each component the run touched, keyed by reference. |
+| `Values` (init) | `IReadOnlyDictionary<string, AgentValue?>` | The latest value of each component the run touched, keyed by reference. |
 
 #### `AgentActStep`
 
@@ -78,12 +78,12 @@ One action to run in an `AgentBridgeService.ActAsync` call.
 
 | Constructor | Description |
 | :--- | :--- |
-| `AgentActStep(string Ref, string Action, IReadOnlyList<object?>? Args = null)` | One action to run in an `AgentBridgeService.ActAsync` call. |
+| `AgentActStep(string Ref, string Action, IReadOnlyList<AgentArgument>? Args = null)` | One action to run in an `AgentBridgeService.ActAsync` call. |
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | `Action` (init) | `string` | The action name, which must be one of the component's `AgentComponentSnapshot.Actions`. |
-| `Args` (init) | `IReadOnlyList<object?>?` | The action arguments, for example the new value for `setValue`. `null` means no arguments. |
+| `Args` (init) | `IReadOnlyList<AgentArgument>?` | The action arguments, for example the new value for `setValue`. Plain values convert to `AgentArgument`, so `["Klyroo"]` and `[12]` work. `null` means no arguments. |
 | `Ref` (init) | `string` | A component reference such as `c2`, or a component label. |
 
 #### `AgentActStepOutcome`
@@ -94,14 +94,32 @@ The outcome of one step that ran successfully, listed in `AgentActResult.Steps`.
 
 | Constructor | Description |
 | :--- | :--- |
-| `AgentActStepOutcome(string Ref, string Action, bool Ok, object? Value)` | The outcome of one step that ran successfully, listed in `AgentActResult.Steps`. |
+| `AgentActStepOutcome(string Ref, string Action, bool Ok, AgentValue? Value)` | The outcome of one step that ran successfully, listed in `AgentActResult.Steps`. |
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | `Action` (init) | `string` | The action that ran. |
 | `Ok` (init) | `bool` | Always `true` for steps the bridge lists. |
 | `Ref` (init) | `string` | The reference of the component the step ran on. |
-| `Value` (init) | `object?` | The component value after the step, or `"[redacted]"` for a sensitive field. |
+| `Value` (init) | `AgentValue?` | The component value after the step, or the text `"[redacted]"` for a sensitive field. `null` when the component has no value. |
+
+#### `AgentBooleanValue`
+
+`Klyroo.Agent` · record · inherits `AgentValue`
+
+A boolean value.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentBooleanValue(bool Flag)` | A boolean value. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Flag` (init) | `bool` | The flag. |
+
+| Method | Returns | Description |
+| :--- | :--- | :--- |
+| `ToDisplayString()` | `string` | A short text for a log or a label: the text, the digits, `true` or `false`, or the items joined by a comma. |
 
 #### `AgentChoiceItem`
 
@@ -120,6 +138,29 @@ One selectable option of a select, filter or view list, as returned by `AgentBri
 | `Selected` (init) | `bool` | Whether the option is currently selected. |
 | `Value` (init) | `string` | The value to pass as the argument of `setValue` or `toggle`. |
 
+#### `AgentColumnRecord`
+
+`Klyroo.Agent` · record · inherits `AgentRecord`
+
+A column of a spreadsheet import, from the `columns` collection.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentColumnRecord(string Key, string Label, bool Required, bool Editable, string Status, int? HeaderIndex, string? Header, string? SuggestedHeader, int? SuggestedHeaderIndex, IReadOnlyList<string> Samples)` | A column of a spreadsheet import, from the `columns` collection. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Editable` (init) | `bool` | Whether `editCell` may change it. |
+| `Header` (init) | `string?` | The text of that file column, or `null`. |
+| `HeaderIndex` (init) | `int?` | The 0-based index of the file column assigned to it, or `null`. |
+| `Key` (init) | `string` | The column key. |
+| `Label` (init) | `string` | The label shown to the user. |
+| `Required` (init) | `bool` | Whether the column must have a value. |
+| `Samples` (init) | `IReadOnlyList<string>` | A few values found in the column. |
+| `Status` (init) | `string` | The mapping status: `matched`, `suggested`, `unmatched`, `ignored` or another status of the importer. |
+| `SuggestedHeader` (init) | `string?` | The file column the importer suggests, or `null`. |
+| `SuggestedHeaderIndex` (init) | `int?` | The index of the suggested file column, or `null`. |
+
 #### `AgentComponentSnapshot`
 
 `Klyroo.Agent` · record
@@ -128,7 +169,7 @@ One registered component as returned by `AgentBridgeService.Snapshot`.
 
 | Constructor | Description |
 | :--- | :--- |
-| `AgentComponentSnapshot(string Ref, string Component, string Label, object? Value, IReadOnlyList<string> Actions, bool Disabled = false, bool OffPage = false, bool ConfirmRequired = false, IReadOnlyList<string>? ConfirmActions = null)` | One registered component as returned by `AgentBridgeService.Snapshot`. |
+| `AgentComponentSnapshot(string Ref, string Component, string Label, AgentValue? Value, IReadOnlyList<string> Actions, bool Disabled = false, bool OffPage = false, bool ConfirmRequired = false, IReadOnlyList<string>? ConfirmActions = null)` | One registered component as returned by `AgentBridgeService.Snapshot`. |
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
@@ -140,7 +181,79 @@ One registered component as returned by `AgentBridgeService.Snapshot`.
 | `Label` (init) | `string` | The human-readable label an agent can also use to address the component. |
 | `OffPage` (init) | `bool` | Whether the component is not rendered right now, for example a conditional form field whose condition is false. |
 | `Ref` (init) | `string` | The stable reference (`c1`, `c2`, ...) used to address the component in an action step. |
-| `Value` (init) | `object?` | The current value, or `"[redacted]"` for a sensitive field. |
+| `Value` (init) | `AgentValue?` | The current value, or the text `"[redacted]"` for a sensitive field. `null` when the component has no value, such as an empty field. |
+
+#### `AgentHeaderRecord`
+
+`Klyroo.Agent` · record · inherits `AgentRecord`
+
+A column of the loaded file, from the `headers` collection.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentHeaderRecord(int Index, string Header, string? UsedBy)` | A column of the loaded file, from the `headers` collection. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Header` (init) | `string` | The header text. |
+| `Index` (init) | `int` | The 0-based index of the file column, to pass to `assignColumn`. |
+| `UsedBy` (init) | `string?` | The key of the column that uses it, or `null`. |
+
+#### `AgentIssueRecord`
+
+`Klyroo.Agent` · record · inherits `AgentRecord`
+
+An issue of a spreadsheet import, from the `issues` collection or the `AgentRowRecord.Issues` of a row.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentIssueRecord(string? Field, string Code, string Level, string Message, int? RowNumber = null)` | An issue of a spreadsheet import, from the `issues` collection or the `AgentRowRecord.Issues` of a row. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Code` (init) | `string` | The stable code of the issue, such as `number` or `value.unknown`. |
+| `Field` (init) | `string?` | The key of the column the issue is about, or `null` for a row issue. |
+| `Level` (init) | `string` | The level: `error` or `warning`. |
+| `Message` (init) | `string` | What is wrong, in words. |
+| `RowNumber` (init) | `int?` | The row number the issue belongs to. Set in the `issues` collection, `null` inside a row. |
+
+#### `AgentListValue`
+
+`Klyroo.Agent` · record · inherits `AgentValue`
+
+A list of values, such as the selected options of a multiple choice.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentListValue(IReadOnlyList<AgentValue> Items)` | A list of values, such as the selected options of a multiple choice. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Items` (init) | `IReadOnlyList<AgentValue>` | The items, in order. |
+
+| Method | Returns | Description |
+| :--- | :--- | :--- |
+| `ToDisplayString()` | `string` | A short text for a log or a label: the text, the digits, `true` or `false`, or the items joined by a comma. |
+
+#### `AgentNumberValue`
+
+`Klyroo.Agent` · record · inherits `AgentValue`
+
+A number, with the digits exactly as the component reports them, so a 64-bit integer or a decimal of 28 digits is not rounded.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentNumberValue(string Text)` | A number, with the digits exactly as the component reports them, so a 64-bit integer or a decimal of 28 digits is not rounded. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Approximate` | `double?` | The number as a `Double`, or `null` when it is out of range. It can lose digits; read `AgentNumberValue.Text` for the exact number. |
+| `Exact` | `decimal?` | The number as a `Decimal`, or `null` when it does not fit one. |
+| `Text` (init) | `string` | The number in the invariant format of JSON, such as `12.5` or `9007199254740993`. |
+
+| Method | Returns | Description |
+| :--- | :--- | :--- |
+| `ToDisplayString()` | `string` | A short text for a log or a label: the text, the digits, `true` or `false`, or the items joined by a comma. |
 
 #### `AgentQueryMatch`
 
@@ -150,7 +263,7 @@ A component matched by `AgentBridgeService.Query`, with the choices that matched
 
 | Constructor | Description |
 | :--- | :--- |
-| `AgentQueryMatch(string Ref, string Component, string Label, IReadOnlyList<AgentChoiceItem> Items, int More = 0, IReadOnlyList<IReadOnlyDictionary<string, object?>>? Records = null, int Total = 0, int Offset = 0)` | A component matched by `AgentBridgeService.Query`, with the choices that matched. |
+| `AgentQueryMatch(string Ref, string Component, string Label, IReadOnlyList<AgentChoiceItem> Items, int More = 0, IReadOnlyList<AgentRecord>? Records = null, int Total = 0, int Offset = 0)` | A component matched by `AgentBridgeService.Query`, with the choices that matched. |
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
@@ -159,19 +272,111 @@ A component matched by `AgentBridgeService.Query`, with the choices that matched
 | `Label` (init) | `string` | The component label. |
 | `More` (init) | `int` | How many matching choices were left out because of the 50 item limit. |
 | `Offset` (init) | `int` | The index of the first record of `Records` in the filtered collection. |
-| `Records` (init) | `IReadOnlyList<IReadOnlyDictionary<string, object?>>?` | One page of the collection named by `AgentQueryRequest.Collection`, each record a map of field names to values. `null` when no collection was requested. |
+| `Records` (init) | `IReadOnlyList<AgentRecord>?` | One page of the collection named by `AgentQueryRequest.Collection`: `AgentRowRecord`, `AgentIssueRecord`, `AgentColumnRecord`, `AgentHeaderRecord` or `AgentQuestionRecord`, by collection. `null` when no collection was requested. |
 | `Ref` (init) | `string` | The stable reference of the component. |
 | `Total` (init) | `int` | How many records the collection holds after filtering, so a caller knows whether to ask for the next page. 0 when `Records` is `null`. |
 
-#### `AgentSpreadsheetSummary`
+#### `AgentQueryResult`
 
-`Klyroo.Agent` · record
+`Klyroo.Agent` · record · inherits `AgentToolResult`
 
-What an agent needs to know about a spreadsheet import to decide the next action, without the rows. It is the `AgentComponentSnapshot.Value` of a spreadsheet component; page through rows and issues with `AgentBridgeService.Query`.
+The result of the `query` tool.
 
 | Constructor | Description |
 | :--- | :--- |
-| `AgentSpreadsheetSummary(string Step, bool FileLoaded, string? FileName, int Rows, int ImportableRows, int InvalidRows, int DiscardedRows, int RowsWithWarnings, int OpenQuestions, IReadOnlyList<string> UnmappedRequiredColumns, bool CanSubmit, string SubmitStatus, int ImportedCount, string? SubmitError)` | What an agent needs to know about a spreadsheet import to decide the next action, without the rows. It is the `AgentComponentSnapshot.Value` of a spreadsheet component; page through rows and issues with `AgentBridgeService.Query`. |
+| `AgentQueryResult(IReadOnlyList<AgentQueryMatch> Matches)` | The result of the `query` tool. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Matches` (init) | `IReadOnlyList<AgentQueryMatch>` | The matching components, as `AgentBridgeService.Query` returns them. |
+
+#### `AgentQuestionChoice`
+
+`Klyroo.Agent` · record
+
+One value an answer of an `AgentQuestionRecord` can map to.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentQuestionChoice(string Value, string Label)` | One value an answer of an `AgentQuestionRecord` can map to. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Label` (init) | `string` | The text shown to the user. |
+| `Value` (init) | `string` | The value to pass to `answerValue`. |
+
+#### `AgentQuestionRecord`
+
+`Klyroo.Agent` · record · inherits `AgentRecord`
+
+A question the importer asks about an unknown value, from the `questions` collection.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentQuestionRecord(string Field, string FieldLabel, string RawValue, bool Open, string? Answer, string? MappedValue, bool CanCreate, int RowCount, IReadOnlyList<int> RowNumbers, IReadOnlyList<AgentQuestionChoice> Choices)` | A question the importer asks about an unknown value, from the `questions` collection. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Answer` (init) | `string?` | The answer given (`Map`, `LeaveEmpty`, `SkipRows` or `Create`), or `null`. |
+| `CanCreate` (init) | `bool` | Whether a new value can be created for the column. |
+| `Choices` (init) | `IReadOnlyList<AgentQuestionChoice>` | The values the answer can map to. |
+| `Field` (init) | `string` | The key of the column the value is in. |
+| `FieldLabel` (init) | `string` | The label of that column. |
+| `MappedValue` (init) | `string?` | The value the answer maps to, or `null`. |
+| `Open` (init) | `bool` | Whether the question still needs an answer. |
+| `RawValue` (init) | `string` | The value as it appears in the file. |
+| `RowCount` (init) | `int` | How many rows have the value. |
+| `RowNumbers` (init) | `IReadOnlyList<int>` | The row numbers that have the value, at most 20. |
+
+#### `AgentRecord`
+
+`Klyroo.Agent` · record
+
+One record of a collection a component pages through with `AgentQueryRequest.Collection`. The subtype depends on the collection: `AgentRowRecord` for `rows`, `AgentIssueRecord` for `issues`, `AgentColumnRecord` for `columns`, `AgentHeaderRecord` for `headers` and `AgentQuestionRecord` for `questions`. The JSON an agent reads has the properties of the subtype, in camel case.
+
+#### `AgentRowRecord`
+
+`Klyroo.Agent` · record · inherits `AgentRecord`
+
+A data row of a spreadsheet import, from the `rows` collection.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentRowRecord(int RowNumber, string Status, bool Importable, string? DiscardReason, bool Edited, IReadOnlyDictionary<string, string> Cells, IReadOnlyList<AgentIssueRecord> Issues)` | A data row of a spreadsheet import, from the `rows` collection. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Cells` (init) | `IReadOnlyDictionary<string, string>` | The text of each cell, keyed by column key. |
+| `DiscardReason` (init) | `string?` | Why the row is left out of the import, or `null`. |
+| `Edited` (init) | `bool` | Whether a cell of the row was edited. |
+| `Importable` (init) | `bool` | Whether the row would be imported. |
+| `Issues` (init) | `IReadOnlyList<AgentIssueRecord>` | What is wrong with the row, empty when nothing is. |
+| `RowNumber` (init) | `int` | The number the user sees for the row in the file. |
+| `Status` (init) | `string` | The row status: `valid`, `warning` or `blocking`. |
+
+#### `AgentSnapshotResult`
+
+`Klyroo.Agent` · record · inherits `AgentToolResult`
+
+The result of the `snapshot` tool.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentSnapshotResult(IReadOnlyList<AgentComponentSnapshot> Components)` | The result of the `snapshot` tool. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Components` (init) | `IReadOnlyList<AgentComponentSnapshot>` | The registered components, as `AgentBridgeService.Snapshot` returns them. |
+
+#### `AgentSpreadsheetSummary`
+
+`Klyroo.Agent` · record · inherits `AgentValue`
+
+What an agent needs to know about a spreadsheet import to decide the next action, without the rows. It is the `AgentComponentSnapshot.Value` of a spreadsheet component, so it is an `AgentValue`; page through rows and issues with `AgentBridgeService.Query`.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentSpreadsheetSummary(string Step, bool FileLoaded, string? FileName, int Rows, int ImportableRows, int InvalidRows, int DiscardedRows, int RowsWithWarnings, int OpenQuestions, IReadOnlyList<string> UnmappedRequiredColumns, bool CanSubmit, string SubmitStatus, int ImportedCount, string? SubmitError)` | What an agent needs to know about a spreadsheet import to decide the next action, without the rows. It is the `AgentComponentSnapshot.Value` of a spreadsheet component, so it is an `AgentValue`; page through rows and issues with `AgentBridgeService.Query`. |
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
@@ -189,6 +394,24 @@ What an agent needs to know about a spreadsheet import to decide the next action
 | `SubmitError` (init) | `string?` | The message of the failed submit, or `null`. |
 | `SubmitStatus` (init) | `string` | The submit state: `Idle`, `Running`, `Done` or `Error`. |
 | `UnmappedRequiredColumns` (init) | `IReadOnlyList<string>` | The labels of the required columns no file column is assigned to. |
+
+#### `AgentTextValue`
+
+`Klyroo.Agent` · record · inherits `AgentValue`
+
+A text value.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentTextValue(string Text)` | A text value. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Text` (init) | `string` | The text. |
+
+| Method | Returns | Description |
+| :--- | :--- | :--- |
+| `ToDisplayString()` | `string` | A short text for a log or a label: the text, the digits, `true` or `false`, or the items joined by a comma. |
 
 #### `AgentToolDefinition`
 
@@ -211,7 +434,7 @@ Describes one agent tool (`snapshot`, `query` or `act`) so you can expose it to 
 
 #### `AgentToolError`
 
-`Klyroo.Agent` · record
+`Klyroo.Agent` · record · inherits `AgentToolResult`
 
 The result of a tool call that could not run, for example because the arguments were malformed or the tool is unknown. Returned by `AgentBridgeService.InvokeToolAsync` instead of an exception, so the model can read the message and correct the call.
 
@@ -223,6 +446,26 @@ The result of a tool call that could not run, for example because the arguments 
 | :--- | :--- | :--- |
 | `Error` (init) | `string` | What was wrong with the call. |
 
+#### `AgentToolResult`
+
+`Klyroo.Agent` · record
+
+What `AgentBridgeService.InvokeToolAsync` returns: one of `AgentSnapshotResult`, `AgentQueryResult`, `AgentActResult` or `AgentToolError`. Match on the subtype.
+
+#### `AgentValue`
+
+`Klyroo.Agent` · record
+
+A value the agent bridge reports: the current value of a component, the value before and after a step, or the value a step left behind. It is a closed set, so a consumer matches on the subtype instead of testing a boxed value: `AgentTextValue`, `AgentNumberValue`, `AgentBooleanValue`, `AgentListValue` and `AgentSpreadsheetSummary`. No value at all is `null`. It serializes to the JSON an agent reads: a string, a number, a boolean, an array, or the summary object. Serialize it through the `AgentValue` type, as a property or with `Serialize<AgentValue>`, so the converter of this type is the one used.
+
+| Method | Returns | Description |
+| :--- | :--- | :--- |
+| `static From(string text)` | `AgentValue` | Creates a text value. |
+| `static From(bool flag)` | `AgentValue` | Creates a boolean value. |
+| `static From(IEnumerable<string> items)` | `AgentValue` | Creates a list of text values. |
+| `static FromJson(JsonElement element)` | `AgentValue?` | Reads a JSON value into an `AgentValue`. A number keeps its digits, a list keeps its order, and a JSON object, which no component holds, is kept as its JSON text. |
+| `ToDisplayString()` | `string` | A short text for a log or a label: the text, the digits, `true` or `false`, or the items joined by a comma. |
+
 #### `ObservedChange`
 
 `Klyroo.Agent` · record
@@ -231,19 +474,42 @@ A notification delivered to subscribers of `AgentBridgeService.Observe` after an
 
 | Constructor | Description |
 | :--- | :--- |
-| `ObservedChange(string Component, string Ref, string Label, string Key, object? Previous, object? Value, string Reason, AgentChangeSource Source, string? Row = null)` | A notification delivered to subscribers of `AgentBridgeService.Observe` after an action step succeeds. For password and one-time-code fields, `Previous` and `Value` are replaced by `"[redacted]"`. |
+| `ObservedChange(string Component, string Ref, string Label, string Key, AgentValue? Previous, AgentValue? Value, string Reason, AgentChangeSource Source, string? Row = null)` | A notification delivered to subscribers of `AgentBridgeService.Observe` after an action step succeeds. For password and one-time-code fields, `Previous` and `Value` are replaced by `"[redacted]"`. |
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | `Component` (init) | `string` | The component kind, for example `input`, `select`, `form` or `dashboard`. |
 | `Key` (init) | `string` | The property that changed. The bridge always reports `value`. |
 | `Label` (init) | `string` | The label the component was registered with. |
-| `Previous` (init) | `object?` | The value before the step ran. |
+| `Previous` (init) | `AgentValue?` | The value before the step ran. |
 | `Reason` (init) | `string` | The action name that caused the change, for example `setValue`. |
 | `Ref` (init) | `string` | The stable reference of the component, for example `c3`. |
 | `Row` (init) | `string?` | The row a step addressed on a tabular component: the user-visible row number of a spreadsheet `editCell` step, the row numbers of `discardRows` and `restoreRows` joined by commas, otherwise `null`. |
 | `Source` (init) | `AgentChangeSource` | What caused the change. |
-| `Value` (init) | `object?` | The value after the step ran. |
+| `Value` (init) | `AgentValue?` | The value after the step ran. |
+
+### Structs
+
+#### `AgentArgument`
+
+`Klyroo.Agent` · struct
+
+One argument of an `AgentActStep`: text, a number, a boolean, `null` or a list of those, held as the JSON value a language model sent. A .NET caller writes it as a plain value, because the conversions below create the JSON: `new AgentActStep("Quantity", "setValue", [12])`. A number keeps its exact digits, so a 64-bit integer or a decimal reaches a field as the digits given. An object is not an argument the bridge accepts: `AgentBridgeService.ActAsync` fails the step.
+
+| Constructor | Description |
+| :--- | :--- |
+| `AgentArgument(JsonElement json)` | Creates an argument from a JSON value, such as the elements of the `args` of an `act` call. |
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `Json` | `JsonElement` | The JSON value. `null` when the argument was created without a value. |
+| `static Null` | `AgentArgument` | The argument that stands for no value. |
+
+| Method | Returns | Description |
+| :--- | :--- | :--- |
+| `static List(params AgentArgument[] items)` | `AgentArgument` | Creates a list argument. |
+| `static List(IEnumerable<string> items)` | `AgentArgument` | Creates a list of text arguments, such as the selected values of a multiple choice. |
+| `static List(IEnumerable<int> items)` | `AgentArgument` | Creates a list of whole numbers, such as row numbers. |
 
 ### Enums
 
@@ -299,16 +565,17 @@ Exposes Klyroo.Form, Klyroo.Dashboard and Klyroo.Spreadsheet controllers to an A
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | `AllowPolicy` (get, set) | `Func<AgentActStep, bool, Task<bool>>?` | The gate called before every `AgentBridgeService.ActAsync` step with the step and whether it needs confirmation, because its component was registered as confirmation-required or the action is one that always is (`submit` and `clearFile` on a spreadsheet). Return `false` to refuse the step. |
+| `Logger` (get, set) | `ILogger?` | Where the bridge logs an action that threw. The text of such an exception can hold a path or a connection string, so `AgentBridgeService.ActAsync` does not give it to the model: the model reads a generic message, and the exception goes here. `null` logs nothing. |
 
 | Method | Returns | Description |
 | :--- | :--- | :--- |
-| `ActAsync(IReadOnlyList<AgentActStep> steps, Func<AgentActStep, bool, Task<bool>>? allow = null)` | `Task<AgentActResult>` | Runs the steps in order. A step is resolved by reference or by label (case and accent insensitive), then checked for existence, ambiguity, disabled state, visibility (a component that is not displayed, such as a conditional field whose condition is false, is refused) and supported action, then passed to `AgentBridgeService.AllowPolicy` and `allow`. The first failing step stops the run; steps that already ran are not rolled back. Each successful step raises one `ObservedChange`. Failures, including an exception thrown while the action runs, are reported in `AgentActResult.Error` rather than thrown. |
+| `ActAsync(IReadOnlyList<AgentActStep> steps, Func<AgentActStep, bool, Task<bool>>? allow = null)` | `Task<AgentActResult>` | Runs the steps in order. A step is resolved by reference or by label (case and accent insensitive), then checked for existence, ambiguity, disabled state, visibility (a component that is not displayed, such as a conditional field whose condition is false, is refused) and supported action, then passed to `AgentBridgeService.AllowPolicy` and `allow`. The first failing step stops the run; steps that already ran are not rolled back. Each successful step raises one `ObservedChange`. Failures, including an exception thrown while the action runs, are reported in `AgentActResult.Error` rather than thrown; the text of such an exception goes to `AgentBridgeService.Logger`, never to the model. |
 | `static GetToolDefinitions()` | `IReadOnlyList<AgentToolDefinition>` | Returns the definitions of the three agent tools, `snapshot`, `query` and `act`, for registration with an LLM or MCP host, each with the JSON Schema of its arguments. |
-| `InvokeToolAsync(string tool, JsonElement arguments, Func<AgentActStep, bool, Task<bool>>? allow = null)` | `Task<object>` | Runs one tool call the way an LLM or MCP host delivers it: a tool name and the raw JSON object of its arguments. Arguments are read as JSON values, so numbers, booleans and lists in `args` keep their type, and a malformed call is reported as an `AgentToolError` rather than thrown, since the model wrote it. |
+| `InvokeToolAsync(string tool, JsonElement arguments, Func<AgentActStep, bool, Task<bool>>? allow = null)` | `Task<AgentToolResult>` | Runs one tool call the way an LLM or MCP host delivers it: a tool name and the raw JSON object of its arguments. Arguments are read as JSON values, so numbers, booleans and lists in `args` keep their type, and a malformed call is reported as an `AgentToolError` rather than thrown, since the model wrote it. |
 | `Observe(Action<ObservedChange> callback)` | `IDisposable` | Subscribes to the changes made through `AgentBridgeService.ActAsync`. The callback runs synchronously after each successful step. Changes a user makes directly in the UI are not reported. An exception thrown by the callback is ignored: the step is already applied, so the run goes on and the other subscribers are still called. |
 | `Query(AgentQueryRequest? request = null)` | `IReadOnlyList<AgentQueryMatch>` | Finds components by label, kind or choice text, or lists the choices of one component, without opening any popup. Matching ignores case and accents. |
 | `RegisterDashboard(DashboardController dashboard)` | `IDisposable` | Registers a dashboard. Each non-headless filter becomes a `select` component, and the dashboard itself accepts `setView`, `resetFilters` and `refresh`. On a filter, `setValue` replaces the selection with the given value, or with every value of a list for a multiple filter; `toggle` adds or removes one value of a multiple filter; `clear` (multiple filters only) empties the selection; and `reset` restores the default values. A value that is not one of the filter's options fails the step. |
-| `RegisterForm(FormController form, bool confirmSubmit = true)` | `IDisposable` | Registers every stateful field of a form, plus the form itself. Fields become `input`, `select`, `checkbox` or `number` components; the form accepts `submit`, `reset` and, for stepped forms, `nextStep` and `previousStep`. Password and one-time-code fields are always redacted. Hidden fields are never exposed. A field that is not in effect, because of its condition, a hidden container, section or tab, or a skipped step (the rule `FormController.ActiveFields` uses for the output), is left out of `AgentBridgeService.Snapshot` and `AgentBridgeService.Query` and refuses every step. A field of another step that is in effect is listed only when `AgentBridgeService.Snapshot` is asked for off-page components. Registering the same form twice creates duplicate labels, which `AgentBridgeService.ActAsync` rejects as ambiguous. |
+| `RegisterForm(IFormRuntime form, bool confirmSubmit = true)` | `IDisposable` | Registers every stateful field of a form, plus the form itself. `form` is the form seen through `IFormRuntime`, so a typed `FormController<TModel>` and a `DynamicFormController` are exposed the same way. Fields become `input`, `select`, `checkbox` or `number` components; the form accepts `submit`, `reset` and, for stepped forms, `nextStep` and `previousStep`. Password and one-time-code fields are always redacted. Hidden inputs are never exposed. A field that is not in effect, because of its condition, a hidden container, section or tab, or a skipped step (`IFormFieldAccess.IsHidden`), is left out of `AgentBridgeService.Snapshot` and `AgentBridgeService.Query` and refuses every step. A field that is disabled refuses every step too, because the form itself would write to it. A field of another step that is in effect is listed only when `AgentBridgeService.Snapshot` is asked for off-page components. Registering the same form twice creates duplicate labels, which `AgentBridgeService.ActAsync` rejects as ambiguous. |
 | `RegisterSpreadsheet(SpreadsheetImporter importer)` | `IDisposable` | Registers an importer as one `spreadsheet` component. Its snapshot value is an `AgentSpreadsheetSummary` (step, row counts, open questions, unmapped required columns), and `AgentBridgeService.Query` with `AgentQueryRequest.Within` and `AgentQueryRequest.Collection` pages through `rows`, `issues`, `columns`, `headers` and `questions`. |
 | `Snapshot(bool includeOffPage = true)` | `IReadOnlyList<AgentComponentSnapshot>` | Lists the registered components in registration order, with their current value and available actions. At most 100 are returned. |
 

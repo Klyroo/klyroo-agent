@@ -8,7 +8,7 @@
 | `IsAotCompatible` | `true` | not set |
 | `IsTrimmable` | `true` | `true` |
 | `SupportedPlatform` | none declared | `browser`, `ios`, `android`, `maccatalyst`, `windows` |
-| Dependencies | none | `Microsoft.AspNetCore.Components.Web`, `Klyroo.Agent.Core`, `Klyroo.Form.Core`, `Klyroo.Dashboard.Core`, `Klyroo.Spreadsheet.Core` |
+| Dependencies | none | `Microsoft.AspNetCore.Components.Web`, `Microsoft.Extensions.Logging.Abstractions`, `Klyroo.Agent.Core`, `Klyroo.Form.Core`, `Klyroo.Dashboard.Core`, `Klyroo.Spreadsheet.Core` |
 
 Both projects build with warnings as errors, so the trimming and AOT analyzers that apply to them are clean.
 

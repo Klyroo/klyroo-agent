@@ -50,27 +50,18 @@ using Klyroo.Form;
 
 var agent = new AgentBridgeService();
 
-var form = new FormController(new FormSchema
+var schema = FormSchema.For<Project>(s =>
 {
-    FormKey = "project-settings",
-    Title = "Project settings",
-    Fields =
+    s.FormKey = "project-settings";
+    s.Title = "Project settings";
+    s.Field(p => p.Name, f => f.Label("Project name"));
+    s.Field(p => p.Region, f => f.Options(
     [
-        new FormFieldSchema { Key = "name", Label = "Project name", DefaultValue = "Apollo" },
-        new FormFieldSchema
-        {
-            Key = "region",
-            Label = "Region",
-            Kind = FormFieldKind.Select,
-            DefaultValue = "us-east",
-            Options =
-            [
-                new FormOptionItem("us-east", "US East"),
-                new FormOptionItem("eu-west", "Europe West"),
-            ],
-        },
-    ],
+        new FormOption<string>("us-east", "US East"),
+        new FormOption<string>("eu-west", "Europe West"),
+    ]));
 });
+var form = new FormController<Project>(schema, new Project());
 
 agent.RegisterForm(form);
 ```
@@ -80,7 +71,7 @@ agent.RegisterForm(form);
 ```csharp
 foreach (var component in agent.Snapshot())
 {
-    Console.WriteLine($"{component.Ref} {component.Component} \"{component.Label}\" = {component.Value}");
+    Console.WriteLine($"{component.Ref} {component.Component} \"{component.Label}\" = {component.Value?.ToDisplayString()}");
 }
 // c1 input "Project name" = Apollo
 // c2 select "Region" = us-east
@@ -104,8 +95,19 @@ var result = await agent.ActAsync(
 ]);
 
 Console.WriteLine(result.Ok ? "done" : result.Error);
-Console.WriteLine(form.GetValue<string>("name")); // Atlas
+Console.WriteLine(form.Get(schema.Field(p => p.Name))); // Atlas
+
+public sealed class Project
+{
+    public string Name { get; set; } = "Apollo";
+
+    public string Region { get; set; } = "us-east";
+}
 ```
+
+The argument of a step is an `AgentArgument`, a small value over the JSON a model would send. Text, `bool`, `int`, `long`,
+`decimal`, `double` and `string[]` convert to it, so `["Atlas"]`, `[12]` and `[new[] { "us", "eu" }]` are enough, and a
+number keeps its digits.
 
 If a step fails, `result.Ok` is `false`, `result.Error` names the step and the reason, and the later steps do not
 run. Earlier steps stay applied.
@@ -120,23 +122,23 @@ Inject the scoped service in the component that owns the controller and register
 @using Klyroo.Form
 @inject AgentBridgeService Agent
 
-<h1>@_form.Schema.Title</h1>
-<p>Project name: @(_form.GetValue<string>("name"))</p>
+<h1>@_form.Title</h1>
+<p>Project name: @_form.Get(_name)</p>
 
 @code {
-    private FormController _form = default!;
+    private static readonly FormSchema<Project> Schema = FormSchema.For<Project>(s =>
+    {
+        s.FormKey = "project-settings";
+        s.Title = "Project settings";
+        s.Field(p => p.Name, f => f.Label("Project name"));
+    });
+
+    private readonly FormField<Project, string> _name = Schema.Field(p => p.Name);
+    private FormController<Project> _form = default!;
 
     protected override void OnInitialized()
     {
-        _form = new FormController(new FormSchema
-        {
-            FormKey = "project-settings",
-            Title = "Project settings",
-            Fields =
-            [
-                new FormFieldSchema { Key = "name", Label = "Project name", DefaultValue = "Apollo" },
-            ],
-        });
+        _form = new FormController<Project>(Schema, new Project());
         _form.Changed += () => InvokeAsync(StateHasChanged);
 
         Agent.RegisterForm(_form, confirmSubmit: true);

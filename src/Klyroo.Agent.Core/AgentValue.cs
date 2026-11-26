@@ -6,8 +6,8 @@ namespace Klyroo.Agent;
 
 /// <summary>
 /// A value the agent bridge reports: the current value of a component, the value before and after a step, or the
-/// value a step left behind. It is a closed set, so a consumer matches on the subtype instead of testing an
-/// <see cref="object"/>: <see cref="AgentTextValue"/>, <see cref="AgentNumberValue"/>, <see cref="AgentBooleanValue"/>,
+/// value a step left behind. It is a closed set, so a consumer matches on the subtype instead of testing a boxed
+/// value: <see cref="AgentTextValue"/>, <see cref="AgentNumberValue"/>, <see cref="AgentBooleanValue"/>,
 /// <see cref="AgentListValue"/> and <see cref="AgentSpreadsheetSummary"/>. No value at all is <see langword="null"/>.
 /// It serializes to the JSON an agent reads: a string, a number, a boolean, an array, or the summary object. Serialize it
 /// through the <see cref="AgentValue"/> type, as a property or with <c>Serialize&lt;AgentValue&gt;</c>, so the converter of this type is the one used.
