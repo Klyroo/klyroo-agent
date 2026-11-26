@@ -1,0 +1,119 @@
+using System.Globalization;
+
+namespace Klyroo.Agent;
+
+public sealed partial class AgentBridgeService
+{
+    /// <summary>
+    /// Registers every stateful field of a form, plus the form itself. Fields become <c>input</c>, <c>select</c>,
+    /// <c>checkbox</c> or <c>number</c> components; the form accepts <c>submit</c>, <c>reset</c> and, for stepped
+    /// forms, <c>nextStep</c> and <c>previousStep</c>. Password and one-time-code fields are always redacted.
+    /// Registering the same form twice creates duplicate labels, which <see cref="ActAsync"/> rejects as ambiguous.
+    /// </summary>
+    /// <param name="form">The form to expose.</param>
+    /// <param name="confirmSubmit">
+    /// Marks the form component as confirmation-required, which is passed to <see cref="AllowPolicy"/> for every
+    /// action on the form (<c>submit</c>, <c>reset</c> and step navigation).
+    /// </param>
+    /// <returns>A handle that removes the form's components when disposed, for example when the form closes.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="form"/> is <see langword="null"/>.</exception>
+    public IDisposable RegisterForm(FormController form, bool confirmSubmit = false)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+        var added = new List<BoundTarget>();
+        foreach (var field in form.AllFields)
+        {
+            if (FormController.IsStateless(field.Kind)) continue;
+            var fieldRef = NextRef();
+            var isPassword = field.Kind is FormFieldKind.Password or FormFieldKind.OneTimeCode;
+            var componentKind = field.Kind switch
+            {
+                FormFieldKind.Select or FormFieldKind.AutoComplete or FormFieldKind.Radio => "select",
+                FormFieldKind.Checkbox or FormFieldKind.Switch => "checkbox",
+                FormFieldKind.Number or FormFieldKind.Slider => "number",
+                _ => "input",
+            };
+            var actions = componentKind switch
+            {
+                "select" => new[] { "setValue", "clear", "reset" },
+                "checkbox" => new[] { "toggle", "setValue", "reset" },
+                _ => new[] { "setValue", "clear", "reset" },
+            };
+
+            added.Add(new BoundTarget
+            {
+                Ref = fieldRef,
+                Component = componentKind,
+                Label = field.Label ?? field.Key,
+                Sensitive = isPassword,
+                IsDisabled = () => form.IsFieldDisabled(field),
+                IsOffPage = () => !form.ShouldRenderField(field),
+                GetValue = () => isPassword ? RedactedValue : form.GetValue(field.Key),
+                Actions = actions,
+                GetChoices = () => form.GetFieldOptions(field)
+                    .Select(o => new AgentChoiceItem(
+                        o.Value,
+                        o.Label,
+                        Selected: Equals(form.GetValue(field.Key)?.ToString(), o.Value),
+                        Disabled: o.Disabled))
+                    .ToList(),
+                ExecuteAction = (action, args) =>
+                {
+                    switch (action)
+                    {
+                        case "setValue":
+                            // The model's argument is coerced to the type the field kind stores, or the step fails with a reason.
+                            if (!FormValueCoercion.TryCoerce(field, form.GetFieldOptions(field), args.Count > 0 ? args[0] : null, out var coerced, out var reason))
+                            {
+                                return Task.FromResult(StepResult.Fail(reason ?? "the value does not fit the field."));
+                            }
+                            form.SetValue(field.Key, coerced, markTouched: true);
+                            return Task.FromResult<StepResult>(true);
+                        case "clear":
+                            form.SetValue(field.Key, field.Kind == FormFieldKind.Checkbox ? false : null, markTouched: true);
+                            return Task.FromResult<StepResult>(true);
+                        case "toggle":
+                            var cur = form.GetValue<bool>(field.Key);
+                            form.SetValue(field.Key, !cur, markTouched: true);
+                            return Task.FromResult<StepResult>(true);
+                        case "reset":
+                            form.ResetField(field.Key);
+                            return Task.FromResult<StepResult>(true);
+                        default:
+                            return Task.FromResult<StepResult>(false);
+                    }
+                },
+            });
+        }
+
+        // Also register the form root for submit / reset / nextStep / previousStep
+        added.Add(new BoundTarget
+        {
+            Ref = NextRef(),
+            Component = "form",
+            Label = form.Schema.Title ?? form.Schema.FormKey,
+            ConfirmRequired = confirmSubmit,
+            GetValue = () => form.IsDirty ? "dirty" : "clean",
+            Actions = form.IsStepped ? ["submit", "reset", "nextStep", "previousStep"] : ["submit", "reset"],
+            GetChoices = () => [],
+            ExecuteAction = async (action, _) =>
+            {
+                switch (action)
+                {
+                    case "submit":
+                        return await form.SubmitAsync();
+                    case "reset":
+                        form.Reset();
+                        return true;
+                    case "nextStep":
+                        return await form.NextStepAsync();
+                    case "previousStep":
+                        return await form.PreviousStepAsync();
+                    default:
+                        return false;
+                }
+            },
+        });
+        return AddTargets(added);
+    }
+}

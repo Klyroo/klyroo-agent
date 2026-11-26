@@ -11,10 +11,17 @@ namespace Klyroo.Agent;
 /// so it needs no JavaScript interop and behaves the same in every render mode. It is not thread safe: use one
 /// instance per user session, which is what <c>AddKlyrooAgent</c> provides.
 /// </summary>
-public sealed class AgentBridgeService
+public sealed partial class AgentBridgeService
 {
     /// <summary>The text that replaces the value of password and one-time-code fields in snapshots, results and observed changes.</summary>
     public const string RedactedValue = "[redacted]";
+
+    /// <summary>The outcome of one action: whether it worked and, when it did not, why, so the model can correct itself.</summary>
+    private readonly record struct StepResult(bool Ok, string? Reason = null)
+    {
+        public static implicit operator StepResult(bool ok) => new(ok);
+        public static StepResult Fail(string reason) => new(false, reason);
+    }
 
     private sealed class BoundTarget
     {
@@ -24,7 +31,7 @@ public sealed class AgentBridgeService
         public required Func<object?> GetValue { get; init; }
         public required IReadOnlyList<string> Actions { get; init; }
         public required Func<IReadOnlyList<AgentChoiceItem>> GetChoices { get; init; }
-        public required Func<string, IReadOnlyList<object?>, Task<bool>> ExecuteAction { get; init; }
+        public required Func<string, IReadOnlyList<object?>, Task<StepResult>> ExecuteAction { get; init; }
         public Func<bool>? IsDisabled { get; init; }
         public Func<bool>? IsOffPage { get; init; }
         public bool Sensitive { get; init; }
@@ -91,114 +98,6 @@ public sealed class AgentBridgeService
     }
 
     /// <summary>
-    /// Registers every stateful field of a form, plus the form itself. Fields become <c>input</c>, <c>select</c>,
-    /// <c>checkbox</c> or <c>number</c> components; the form accepts <c>submit</c>, <c>reset</c> and, for stepped
-    /// forms, <c>nextStep</c> and <c>previousStep</c>. Password and one-time-code fields are always redacted.
-    /// Registering the same form twice creates duplicate labels, which <see cref="ActAsync"/> rejects as ambiguous.
-    /// </summary>
-    /// <param name="form">The form to expose.</param>
-    /// <param name="confirmSubmit">
-    /// Marks the form component as confirmation-required, which is passed to <see cref="AllowPolicy"/> for every
-    /// action on the form (<c>submit</c>, <c>reset</c> and step navigation).
-    /// </param>
-    /// <returns>A handle that removes the form's components when disposed, for example when the form closes.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="form"/> is <see langword="null"/>.</exception>
-    public IDisposable RegisterForm(FormController form, bool confirmSubmit = false)
-    {
-        ArgumentNullException.ThrowIfNull(form);
-        var added = new List<BoundTarget>();
-        foreach (var field in form.AllFields)
-        {
-            if (FormController.IsStateless(field.Kind)) continue;
-            var fieldRef = NextRef();
-            var isPassword = field.Kind is FormFieldKind.Password or FormFieldKind.OneTimeCode;
-            var componentKind = field.Kind switch
-            {
-                FormFieldKind.Select or FormFieldKind.AutoComplete or FormFieldKind.Radio => "select",
-                FormFieldKind.Checkbox or FormFieldKind.Switch => "checkbox",
-                FormFieldKind.Number or FormFieldKind.Slider => "number",
-                _ => "input",
-            };
-            var actions = componentKind switch
-            {
-                "select" => new[] { "setValue", "clear", "reset" },
-                "checkbox" => new[] { "toggle", "setValue", "reset" },
-                _ => new[] { "setValue", "clear", "reset" },
-            };
-
-            added.Add(new BoundTarget
-            {
-                Ref = fieldRef,
-                Component = componentKind,
-                Label = field.Label ?? field.Key,
-                Sensitive = isPassword,
-                IsDisabled = () => form.IsFieldDisabled(field),
-                IsOffPage = () => !form.ShouldRenderField(field),
-                GetValue = () => isPassword ? RedactedValue : form.GetValue(field.Key),
-                Actions = actions,
-                GetChoices = () => form.GetFieldOptions(field)
-                    .Select(o => new AgentChoiceItem(
-                        o.Value,
-                        o.Label,
-                        Selected: Equals(form.GetValue(field.Key)?.ToString(), o.Value),
-                        Disabled: o.Disabled))
-                    .ToList(),
-                ExecuteAction = (action, args) =>
-                {
-                    switch (action)
-                    {
-                        case "setValue":
-                            form.SetValue(field.Key, args.Count > 0 ? args[0] : null, markTouched: true);
-                            return Task.FromResult(true);
-                        case "clear":
-                            form.SetValue(field.Key, field.Kind == FormFieldKind.Checkbox ? false : null, markTouched: true);
-                            return Task.FromResult(true);
-                        case "toggle":
-                            var cur = form.GetValue<bool>(field.Key);
-                            form.SetValue(field.Key, !cur, markTouched: true);
-                            return Task.FromResult(true);
-                        case "reset":
-                            form.ResetField(field.Key);
-                            return Task.FromResult(true);
-                        default:
-                            return Task.FromResult(false);
-                    }
-                },
-            });
-        }
-
-        // Also register the form root for submit / reset / nextStep / previousStep
-        added.Add(new BoundTarget
-        {
-            Ref = NextRef(),
-            Component = "form",
-            Label = form.Schema.Title ?? form.Schema.FormKey,
-            ConfirmRequired = confirmSubmit,
-            GetValue = () => form.IsDirty ? "dirty" : "clean",
-            Actions = form.IsStepped ? ["submit", "reset", "nextStep", "previousStep"] : ["submit", "reset"],
-            GetChoices = () => [],
-            ExecuteAction = async (action, _) =>
-            {
-                switch (action)
-                {
-                    case "submit":
-                        return await form.SubmitAsync();
-                    case "reset":
-                        form.Reset();
-                        return true;
-                    case "nextStep":
-                        return await form.NextStepAsync();
-                    case "previousStep":
-                        return await form.PreviousStepAsync();
-                    default:
-                        return false;
-                }
-            },
-        });
-        return AddTargets(added);
-    }
-
-    /// <summary>
     /// Registers a dashboard. Each non-headless filter becomes a <c>select</c> component, and the dashboard itself
     /// accepts <c>setView</c>, <c>resetFilters</c> and <c>refresh</c>. On a filter, <c>setValue</c> replaces the
     /// selection with the given value, or with every value of a list for a multiple filter; <c>toggle</c> adds or
@@ -226,7 +125,7 @@ public sealed class AgentBridgeService
                 GetChoices = () => filter.Items
                     .Select(i => new AgentChoiceItem(i.Value, i.Label, filter.IsSelected(i.Value), i.Disabled))
                     .ToList(),
-                ExecuteAction = (action, args) => Task.FromResult(action switch
+                ExecuteAction = (action, args) => Task.FromResult<StepResult>(action switch
                 {
                     "setValue" => SetFilterSelection(filter, args.Count > 0 ? args[0] : null),
                     "toggle" => ToggleFilterValue(filter, args.Count > 0 ? args[0]?.ToString() : null),
@@ -324,55 +223,6 @@ public sealed class AgentBridgeService
         var wasSelected = filter.IsSelected(value);
         filter.Toggle(value);
         return filter.IsSelected(value) != wasSelected;
-    }
-
-    /// <summary>
-    /// Registers an importer as one <c>spreadsheet</c> component that accepts <c>editCell</c>, <c>nextStep</c>,
-    /// <c>previousStep</c>, <c>submit</c> and <c>clearFile</c>. Loading the file itself is not an agent action.
-    /// </summary>
-    /// <param name="importer">The importer to expose.</param>
-    /// <returns>A handle that removes the importer's component when disposed.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="importer"/> is <see langword="null"/>.</exception>
-    public IDisposable RegisterSpreadsheet(SpreadsheetImporter importer)
-    {
-        ArgumentNullException.ThrowIfNull(importer);
-        return AddTargets([new BoundTarget
-        {
-            Ref = NextRef(),
-            Component = "spreadsheet",
-            Label = importer.Schema.Key,
-            GetValue = () => importer.CurrentStepKey,
-            Actions = ["editCell", "nextStep", "previousStep", "submit", "clearFile"],
-            GetChoices = () => [],
-            RowOf = (action, args) => action == "editCell" && args.Count > 0 ? args[0]?.ToString() : null,
-            ExecuteAction = async (action, args) =>
-            {
-                switch (action)
-                {
-                    case "editCell":
-                        if (args.Count < 3) return false;
-                        if (!int.TryParse(args[0]?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var rIdx)
-                            || rIdx < 0 || rIdx >= importer.AllRows.Count) return false;
-                        var fKey = args[1]?.ToString() ?? "";
-                        if (!importer.Schema.Columns.Any(c => string.Equals(c.Key, fKey, StringComparison.Ordinal))) return false;
-                        var text = args[2]?.ToString() ?? "";
-                        importer.EditCell(rIdx, fKey, text);
-                        return true;
-                    case "nextStep":
-                        return importer.NextStep();
-                    case "previousStep":
-                        return importer.PreviousStep();
-                    case "submit":
-                        await importer.SubmitAsync();
-                        return importer.SubmitStatus == SpreadsheetSubmitStatus.Done;
-                    case "clearFile":
-                        importer.ClearFile();
-                        return true;
-                    default:
-                        return false;
-                }
-            },
-        }]);
     }
 
     /// <summary>Lists the registered components in registration order, with their current value and available actions. At most 100 are returned.</summary>
@@ -522,10 +372,10 @@ public sealed class AgentBridgeService
             }
 
             var previousValue = target.Sensitive ? RedactedValue : target.GetValue();
-            bool ok;
+            StepResult result;
             try
             {
-                ok = await target.ExecuteAction(step.Action, step.Args ?? []);
+                result = await target.ExecuteAction(step.Action, step.Args ?? []);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -536,9 +386,10 @@ public sealed class AgentBridgeService
             var currentValue = target.Sensitive ? RedactedValue : target.GetValue();
             values[target.Ref] = currentValue;
 
-            if (!ok)
+            if (!result.Ok)
             {
-                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" returned false.");
+                var why = result.Reason is null ? "returned false" : $"was rejected: {result.Reason}";
+                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" {why}.");
             }
 
             outcomes.Add(new AgentActStepOutcome(target.Ref, step.Action, true, currentValue));
@@ -574,7 +425,7 @@ public sealed class AgentBridgeService
 
     private string NextRef() => $"c{++_refCounter}";
 
-    private static string Normalize(string? text)
+    internal static string Normalize(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
         var formD = text.Trim().Normalize(NormalizationForm.FormD);
