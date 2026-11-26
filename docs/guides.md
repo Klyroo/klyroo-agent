@@ -19,8 +19,8 @@ Samples use `agent` for an `AgentBridgeService` and `form` for a `FormController
 
 Goal: let an agent fill a form but not submit it without a human decision.
 
-Register the form with `confirmSubmit: true` and set an `AllowPolicy`. The policy runs before every step and
-receives the step and whether its target was flagged:
+Forms are registered with `confirmSubmit: true` by default (pass `false` to opt out), so set an `AllowPolicy`. The
+policy runs before every step and receives the step and whether its target was flagged:
 
 ```csharp
 var approved = false; // set to true when the user clicks "Approve" in your UI
@@ -39,7 +39,7 @@ drives the agent. The flag is set on the form component, so it also covers `rese
 only `submit`. A spreadsheet `submit` and `clearFile` are flagged by the bridge itself, whatever you register.
 
 For a decision that belongs to one call, such as a request that carries its own user, pass a callback to
-`ActAsync`. It runs after `AllowPolicy`, both must return `true`, and passing it counts as having a policy for flagged steps:
+`ActAsync`. It runs before `AllowPolicy` (a step it refuses never prompts whoever `AllowPolicy` asks), both must return `true`, and passing it counts as having a policy for flagged steps:
 
 ```csharp
 var result = await agent.ActAsync(
@@ -51,8 +51,10 @@ var result = await agent.ActAsync(
 
 Goal: let an agent fill a stepped form and move between its steps.
 
-A form built from `Steps` exposes `nextStep` and `previousStep` on the form component. Fields of the current and
-other steps are all registered; fields whose `Condition` is false are marked `OffPage` and refuse every step.
+A form built from `Steps` exposes `nextStep` and `previousStep` on the form component. Fields of the current step
+are listed; fields of another step that is in effect appear only with `Snapshot(includeOffPage: true)`, flagged `OffPage`.
+A field that is not in effect, because its `Condition` is false, its container or tab is hidden, or its step is skipped, is
+absent and refuses every step, and `Hidden` fields are never exposed.
 
 ```csharp
 var wizard = new FormController(new FormSchema
@@ -256,7 +258,8 @@ step needs it. Instead it splits the work in two:
 - `act_with_approval` is wrapped in `ApprovalRequiredAIFunction`. A `FunctionInvokingChatClient` does not run it: it
   returns a `ToolApprovalRequestContent` that holds the tool call, with its steps, to your code. Show the steps to the
   user and answer with `request.CreateResponse(approved)`. Only an approved call runs, and `AllowPolicy` still applies on
-  top of it.
+  top of it. `act` refuses a confirmation step before `AllowPolicy` is asked, so your policy is never prompted for a step
+  that is going to be refused.
 
 If your own code already decides, for example an `AllowPolicy` that asks the user in your UI, ask for three functions
 only: `agent.AsAIFunctions(new AgentAIFunctionOptions { Confirmation = AgentConfirmationMode.UseBridgePolicy })`.
@@ -402,7 +405,8 @@ your controllers.
 </script>
 ```
 
-Elements marked `data-agent-confirm` are refused unless `allow` is set; `act` also refuses disabled and hidden elements and
+Elements marked `data-agent-confirm` are refused unless `allow` is set and returns exactly `true`; `createAgent({ root })`
+limits the agent to one subtree; `act` also refuses readonly elements and actions the snapshot does not list; `act` also refuses disabled and hidden elements and
 returns `{ ok: false, error }` when an action throws. Mark a field with `data-agent-redact` to hide its value in snapshots and observed changes; password inputs and
 `kly-pin-input` are redacted automatically. `registerWebMcp` does nothing when the browser has no `modelContext`
 with a `registerTool` function. See [Concepts](concepts.md#the-browser-runtime) for what the module discovers.

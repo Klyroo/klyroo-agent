@@ -17,7 +17,7 @@ in a console app.
 - **Query**: lists the choices of a select or filter, filtered by text, without opening a popup. Matching ignores case and accents.
 - **Act**: runs named actions (`setValue`, `toggle`, `clear`, `reset`, `submit`, `nextStep`, `setView`, `refresh`, and the spreadsheet actions `assignColumn`, `answerValue`, `editCell`, `discardRows` and more) by reference or label, stops at the first failing step and reports why.
 - **Typed values**: `setValue` on a form field coerces what a model sends (JSON numbers, text, lists) to the type of the field kind and refuses a select value that is not an option, with the reason.
-- **Permission gate**: `AllowPolicy` and a per-call `allow` callback can refuse any step. Steps that need confirmation (forms registered with `confirmSubmit`, a spreadsheet `submit` or `clearFile`) are refused when no policy is set.
+- **Permission gate**: `AllowPolicy` and a per-call `allow` callback can refuse any step. Steps that need confirmation (forms, which are registered with `confirmSubmit: true` by default, a spreadsheet `submit` or `clearFile`) are refused when no policy is set.
 - **Spreadsheet imports**: the snapshot value is a summary (step, counts, open questions, unmapped required columns) and `Query` pages through rows and issues, addressed by the row number the user sees.
 - **Secret redaction**: password and one-time-code fields appear as `[redacted]` in snapshots, results and observed changes.
 - **Observe**: `Observe` delivers one `ObservedChange` per successful step, with the previous and new value.

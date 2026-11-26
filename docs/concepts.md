@@ -22,7 +22,8 @@ gets and which actions it offers:
 
 | Registered object | Components created | Actions |
 | :--- | :--- | :--- |
-| Form field | `select` (Select, AutoComplete, Radio), `checkbox` (Checkbox, Switch), `number` (Number, Slider), otherwise `input` | `setValue`, `clear`, `reset`; checkboxes offer `toggle`, `setValue`, `reset` instead (no `clear`) |
+| Form field | `select` (Select, AutoComplete, Radio), `checkbox` (Checkbox, Switch), `number` (Number, Slider), otherwise `input` | `setValue`, `clear`, `reset`; checkboxes offer `toggle`, `setValue`, `clear` (stores `false`), `reset` |
+| Hidden form fields | none | never registered: the agent can neither read nor write them |
 | The form | `form` | `submit`, `reset`; stepped forms also `nextStep`, `previousStep` |
 | Dashboard filter | `select` | `setValue`, `reset`; multiple filters also `toggle`, `clear` |
 | The dashboard | `dashboard` | `setView`, `resetFilters`, `refresh` |
@@ -42,14 +43,18 @@ first check that fails:
 2. **Check state.** A component whose disabled check returns true rejects the step.
 3. **Check the action.** The action name must be in the component's action list.
 4. **Ask the policy.** A step that needs confirmation is refused when neither `AllowPolicy` nor an `allow` callback is
-   set. Otherwise `AllowPolicy` runs, then the `allow` callback passed to the call, and either returning `false`
-   refuses the step.
+   set. Otherwise the `allow` callback passed to the call runs first, then `AllowPolicy`, and either returning `false`
+   refuses the step. The per-call gate goes first so that a step it refuses never prompts the person `AllowPolicy` asks.
 5. **Run it.** The action calls the controller. An action that returns `false`, or refuses its argument with a reason
    (a select value that is not an option, a row number the file does not have), fails the step and the message says why.
 6. **Report it.** The new value is stored in `AgentActResult.Values`, the step is added to `Steps`, and one
    `ObservedChange` is delivered to subscribers.
 
-A component that is not displayed (a conditional field whose condition is false) refuses every step.
+A form field that is not in effect refuses every step and is absent from `Snapshot` and `Query`. "In effect" is the rule
+`FormController.ActiveFields` applies to the form output: the field's condition is true, its containers, tab and section
+are visible, and its step is the current one or is not skipped. A field of another step that is in effect is listed only by
+`Snapshot(includeOffPage: true)`, flagged `OffPage`, and `Query` leaves it out. A call carries at most
+`AgentBridgeService.MaxStepsPerAct` (50) steps; a longer list fails before any step runs.
 
 Failures are values, not exceptions: you get `Ok = false` and an `Error` message that names the step number, the
 component and the reason, including when the action throws (a failing `OnSubmit`, for example). That makes the message safe to return to a language model as a tool result so it can
@@ -57,8 +62,8 @@ correct itself. There is no rollback. If step 3 of 5 fails, steps 1 and 2 stay a
 
 ## Confirmation and policy
 
-The bridge does not decide what is risky in your app. You mark it: `RegisterForm(form, confirmSubmit: true)` sets
-`ConfirmRequired` on the form component, and every action on that component carries the flag to the policy. Some
+The bridge does not decide what is risky in your app. You mark it: `RegisterForm(form, confirmSubmit: true)`, which is the default, sets
+`ConfirmRequired` on the form component (pass `confirmSubmit: false` to let an agent submit freely), and every action on that component carries the flag to the policy. Some
 actions are marked by the bridge itself: a spreadsheet `submit` and `clearFile` always need confirmation, listed in
 `ConfirmActions` of the snapshot entry. `AllowPolicy` is the single place where you turn the flag into a decision,
 typically by asking the user.
@@ -70,7 +75,10 @@ until you decide how it is approved. The library never opens a dialog, it only a
 ## Values the model sends
 
 A model delivers arguments as JSON, so numbers, booleans and lists arrive as `JsonElement` and often as text. `ActAsync`
-unwraps them once, and a form `setValue` then coerces the value to what the field kind stores, with the invariant
+unwraps them once: a JSON number becomes a `long` when the token is an integer in range, a `decimal` when that reproduces the
+token exactly (`1.50` stays `1.50`), and otherwise keeps its digits as sent. Text fields and spreadsheet cells therefore get
+the exact digits (`12345678901234567890` stays that text), numeric fields store a `double`, and a whole number written
+`25.0` counts as an integer. Then and a form `setValue` then coerces the value to what the field kind stores, with the invariant
 culture:
 
 | Field kind | Stored value | Accepted from the model |
@@ -90,6 +98,9 @@ culture:
 
 A value that does not fit fails the step with the reason and leaves the form untouched, so the model can correct
 itself. An empty value (`null` or `""`) clears a text, number, date or single choice field, and empties a multiple choice.
+The `clear` action stores the empty value of the kind: `false` for a checkbox or switch, an empty list for tags and
+multiple choices, `null` elsewhere. `reset` restores the schema default through the form. A dashboard `setView` fails
+when the key is not an enabled view.
 
 ## Spreadsheet imports
 
@@ -141,7 +152,14 @@ The runtime discovers elements that match `[data-kly-primitive]`, the `kly-*` cu
 associated `label`, a form-field container, or the placeholder, title or name. Its actions are `setValue`, `clear`,
 `toggle`, `setChecked`, `press` and `focus`, plus whatever API a registered primitive exposes. `snapshot` returns at
 most 100 elements and `query` at most 50 matches. Elements marked `data-agent-confirm` set `step.confirm` for the
-`allow` callback. Like the .NET bridge, it accepts a policy at two levels: `allow` on `createAgent` and `allow` on each `act` call, and it refuses a `data-agent-confirm` element when neither is set. `act` refuses disabled elements (including those inside a disabled `fieldset`) and elements that are not displayed, and turns an exception thrown by an action or a policy into `{ ok: false, error }`.
+`allow` callback. Like the .NET bridge, it accepts a policy at two levels: `allow` on `createAgent` and `allow` on each `act` call, and it refuses a `data-agent-confirm` element when neither is set. `act` refuses disabled elements (including those inside a disabled `fieldset`) and elements that are not displayed, and turns an exception thrown by an action or a policy into `{ ok: false, error }`. A `data-agent-confirm` step runs only
+when a policy returns exactly `true`. `act` refuses edits (`setValue`, `clear`, `toggle`, `setChecked`) on `readonly` and
+`aria-readonly` elements, and runs only actions the snapshot lists for the element. An element counts as not displayed
+when it, or an ancestor, is `hidden`, `inert` or `aria-hidden="true"`, is in a closed dialog, or CSS hides it
+(`display`, `visibility`, `content-visibility`). An exact ref beats a label that looks like one. `createAgent({ root })` limits
+snapshot, query and act to one subtree (an element or a function returning one), so the agent cannot act on what it was
+not shown; a `within` outside the root is ignored. Refs are weak and dropped when their element leaves the document.
+A call accepts at most 50 steps.
 
 `registerWebMcp` publishes `snapshot`, `query` and `act` to the browser's `modelContext` (WebMCP) when
 `document.modelContext` or `navigator.modelContext` exposes `registerTool`, and returns a function that

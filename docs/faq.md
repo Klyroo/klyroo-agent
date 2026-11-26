@@ -23,18 +23,18 @@ dashboard filter with `Enabled` set to false. Change the state that disables it 
 
 **A step fails with `action "..." is not supported`**
 
-Each component only accepts the actions listed in its snapshot entry. A checkbox has no `clear`, a plain field has no
+Each component only accepts the actions listed in its snapshot entry. A plain field has no
 `toggle`, and only stepped forms have `nextStep`. Read `Actions` from `Snapshot`.
 
 **A step fails with `returned false`**
 
 The controller ran the action and declined. Typical causes are a `submit` or `nextStep` on a form that fails
-validation, or `setView` with no argument. Most refusals carry a reason after `was rejected:`, such as a select value that
-is not an option or a row number the file does not have. Earlier steps stay applied.
+validation. Most refusals carry a reason after `was rejected:`, such as a select value that
+is not an option, a row number the file does not have, or a `setView` key that is not an enabled view. Earlier steps stay applied.
 
 **A step fails with `needs confirmation and no AllowPolicy is set`**
 
-The step targets a component registered with `confirmSubmit: true`, or is a spreadsheet `submit` or `clearFile`, and
+The step targets a form (forms need confirmation by default, `confirmSubmit: false` opts out) or another component registered as confirmation-required, or is a spreadsheet `submit` or `clearFile`, and
 nothing decides about it. This is the default on purpose. Set `AllowPolicy` (or pass `allow` to `ActAsync`) to approve
 such steps; see [Require approval before consequential actions](guides.md#require-approval-before-consequential-actions).
 
@@ -45,14 +45,14 @@ service is configured; `AddKlyrooAgent()` itself sets no policy.
 
 **Submitting a flagged form is refused**
 
-`confirmSubmit: true` makes every action on the form need confirmation, and without an `AllowPolicy` or an `allow`
+`confirmSubmit: true` (the default) makes every action on the form need confirmation, and without an `AllowPolicy` or an `allow`
 callback those steps are refused. Earlier previews let them through, which is a breaking change; set a policy that
 approves them to get the old behavior. See [Require approval before consequential actions](guides.md#require-approval-before-consequential-actions).
 
 **`Snapshot` is missing components**
 
 `Snapshot` returns at most 100 components. Stateless form fields (`Info`, `Divider`, `Section`, `Button`) are never
-registered, and dashboard filters marked headless are skipped.
+registered, `Hidden` form fields are never registered, fields that are not in effect (condition false, hidden container, tab or section, skipped step) are left out, and fields of another step appear only with `includeOffPage`. Dashboard filters marked headless are skipped.
 
 **An observer does not fire when a user edits a field**
 
