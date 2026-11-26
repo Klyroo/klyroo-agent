@@ -422,4 +422,25 @@ public sealed class SpreadsheetAdapterTests
         Assert.Equal(summaryBefore, Assert.IsType<AgentSpreadsheetSummary>(agent.Snapshot().Single().Value) with { UnmappedRequiredColumns = [] });
         Assert.Empty(submitted);
     }
+
+    [Fact]
+    public async Task DiscardRows_and_RestoreRows_handle_thousands_of_row_numbers_and_duplicates()
+    {
+        var csv = "Full name;Years;Team\n" + string.Join("\n", Enumerable.Range(1, 5000).Select(i => $"P{i};{i};Engine"));
+        var (agent, importer, _, _) = Setup(csv);
+        var numbers = Enumerable.Range(2, 5000).Concat(Enumerable.Range(2, 100)).Select(n => (object?)n).ToList();
+
+        var discarded = await agent.ActAsync([new AgentActStep("people", "discardRows", [numbers])]);
+        Assert.True(discarded.Ok, discarded.Error);
+        Assert.Equal(5000, importer.DiscardedRows.Count);
+
+        var restored = await agent.ActAsync([new AgentActStep("people", "restoreRows", [numbers])]);
+        Assert.True(restored.Ok, restored.Error);
+        Assert.Empty(importer.DiscardedRows);
+
+        var unknown = await agent.ActAsync([new AgentActStep("people", "discardRows", [new List<object?> { 2, 6000, 6001 }])]);
+        Assert.False(unknown.Ok);
+        Assert.Contains("6000, 6001", unknown.Error);
+        Assert.Empty(importer.DiscardedRows);
+    }
 }

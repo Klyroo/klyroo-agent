@@ -193,4 +193,34 @@ public sealed class ConfirmationPolicyTests
         Assert.Equal(0, submits);
         Assert.True(agent.Snapshot().Single(c => c.Component == "form").ConfirmRequired);
     }
+
+    [Fact]
+    public async Task A_call_with_more_than_the_step_cap_runs_nothing()
+    {
+        var (agent, form, _) = ConfirmedForm();
+        var tooMany = Enumerable.Range(0, AgentBridgeService.MaxStepsPerAct + 1).Select(i => new AgentActStep("Amount", "setValue", [i])).ToList();
+
+        var refused = await agent.ActAsync(tooMany);
+
+        Assert.False(refused.Ok);
+        Assert.Contains("Too many steps", refused.Error);
+        Assert.Empty(refused.Steps);
+        Assert.Null(form.GetValue("amount"));
+
+        var atCap = await agent.ActAsync(tooMany.Take(AgentBridgeService.MaxStepsPerAct).ToList());
+        Assert.True(atCap.Ok, atCap.Error);
+        Assert.Equal(49.0, form.GetValue("amount"));
+    }
+
+    [Fact]
+    public async Task The_cap_also_applies_to_tool_calls()
+    {
+        var (agent, form, _) = ConfirmedForm();
+        var steps = string.Join(",", Enumerable.Range(0, 51).Select(i => $$"""{ "ref": "Amount", "action": "setValue", "args": [{{i}}] }"""));
+
+        var result = await agent.InvokeToolAsync("act", System.Text.Json.JsonDocument.Parse($$"""{ "steps": [{{steps}}] }""").RootElement.Clone());
+
+        Assert.False(Assert.IsType<AgentActResult>(result).Ok);
+        Assert.Null(form.GetValue("amount"));
+    }
 }

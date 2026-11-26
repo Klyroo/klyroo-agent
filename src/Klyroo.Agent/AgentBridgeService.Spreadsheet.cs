@@ -223,7 +223,7 @@ public sealed partial class AgentBridgeService
         return byLabel.Count == 1 ? byLabel[0] : null;
     }
 
-    // Reads row numbers from separate arguments or from one list, and maps them to the importer's row indexes.
+    // Reads row numbers from separate arguments or from one list. Duplicates are dropped; one pass, linear in the arguments.
     private static bool ParseRowNumbers(IReadOnlyList<object?> args, out List<int> rowNumbers, out string? error)
     {
         rowNumbers = [];
@@ -234,6 +234,7 @@ public sealed partial class AgentBridgeService
             error = "give at least one row number.";
             return false;
         }
+        var seen = new HashSet<int>();
         foreach (var item in raw)
         {
             if (!AgentArgs.TryInt(item, out var number))
@@ -241,25 +242,28 @@ public sealed partial class AgentBridgeService
                 error = $"\"{item}\" is not a row number.";
                 return false;
             }
-            if (!rowNumbers.Contains(number)) rowNumbers.Add(number);
+            if (seen.Add(number)) rowNumbers.Add(number);
         }
         return true;
     }
 
+    // Maps row numbers to importer indexes with one dictionary over the rows, so a large list costs rows + numbers, not rows x numbers.
     private static bool TryRowIndexes(SpreadsheetImporter importer, IReadOnlyList<object?> args, out List<int> indexes, out List<int> numbers, out string? error)
     {
         indexes = [];
         if (!ParseRowNumbers(args, out numbers, out error)) return false;
+        var byNumber = new Dictionary<int, int>(importer.AllRows.Count);
+        foreach (var row in importer.AllRows) byNumber.TryAdd(row.RowNumber, row.Index);
         var unknown = new List<int>();
         foreach (var number in numbers)
         {
-            var row = importer.AllRows.FirstOrDefault(r => r.RowNumber == number);
-            if (row is null) unknown.Add(number);
-            else indexes.Add(row.Index);
+            if (byNumber.TryGetValue(number, out var index)) indexes.Add(index);
+            else unknown.Add(number);
         }
         if (unknown.Count > 0)
         {
-            error = $"no data row has the row number {string.Join(", ", unknown)}. Row numbers are the ones shown in the file; use query with collection \"rows\" to list them.";
+            var shown = string.Join(", ", unknown.Take(10)) + (unknown.Count > 10 ? ", ..." : "");
+            error = $"no data row has the row number {shown}. Row numbers are the ones shown in the file; use query with collection \"rows\" to list them.";
             return false;
         }
         return true;

@@ -74,6 +74,9 @@ public sealed partial class AgentBridgeService
     {
     }
 
+    /// <summary>The most steps one <see cref="ActAsync"/> call accepts. A longer list is refused before any step runs, so a runaway model cannot queue unbounded work.</summary>
+    public const int MaxStepsPerAct = 50;
+
     private readonly List<BoundTarget> _targets = [];
     private readonly List<Action<ObservedChange>> _observers = [];
     private int _refCounter;
@@ -339,7 +342,7 @@ public sealed partial class AgentBridgeService
     /// including an exception thrown while the action runs, are reported in <see cref="AgentActResult.Error"/>
     /// rather than thrown.
     /// </summary>
-    /// <param name="steps">The steps to run.</param>
+    /// <param name="steps">The steps to run, at most <see cref="MaxStepsPerAct"/>; more fail the call before any step runs.</param>
     /// <param name="allow">An extra gate for this call only, called with the same arguments before <see cref="AllowPolicy"/>, so a refusal here never prompts whoever <see cref="AllowPolicy"/> asks. It also counts as a policy for steps that need confirmation.</param>
     /// <returns>The outcome of the run.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="steps"/> is <see langword="null"/>.</exception>
@@ -350,6 +353,10 @@ public sealed partial class AgentBridgeService
         ArgumentNullException.ThrowIfNull(steps);
         var outcomes = new List<AgentActStepOutcome>();
         var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (steps.Count > MaxStepsPerAct)
+        {
+            return new AgentActResult(false, outcomes, values, $"Too many steps: {steps.Count} given, at most {MaxStepsPerAct} per call. Nothing ran; send fewer steps.");
+        }
 
         for (var i = 0; i < steps.Count; i++)
         {
