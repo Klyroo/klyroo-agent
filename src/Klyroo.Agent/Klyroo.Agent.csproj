@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Klyroo.Agent</RootNamespace>
     <PackageId>Klyroo.Agent</PackageId>
+    <PackageTags>klyroo;blazor;ai;agents;tools;mcp;webmcp</PackageTags>
     <Description>Klyroo Semantic Agent Bridge for Blazor Web &amp; .NET MAUI Hybrid: connects Klyroo.Form, Klyroo.Dashboard, and Klyroo.Spreadsheet to AI agents and WebMCP.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsTrimmable>true</IsTrimmable>

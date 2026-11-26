@@ -4,7 +4,7 @@ A semantic bridge that lets AI agents read and operate Klyroo forms, dashboards 
 
 [![CI](https://github.com/klyroo/klyroo-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/klyroo/klyroo-agent/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/vpre/Klyroo.Agent.svg)](https://www.nuget.org/packages/Klyroo.Agent)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/klyroo/klyroo-agent/blob/main/LICENSE)
 
 An agent that drives a UI through CSS selectors breaks whenever the markup changes. Klyroo.Agent skips the markup:
 you register the controllers behind your UI, and the agent works with their labels, values and named actions. The
@@ -28,7 +28,7 @@ in a console app.
 | :--- | :--- |
 | [`Klyroo.Agent.Core`](https://www.nuget.org/packages/Klyroo.Agent.Core) | The data types of the bridge (`AgentActStep`, `AgentActResult`, `ObservedChange`, ...) and `UndoStack<T>`. No dependencies, NativeAOT compatible. |
 | [`Klyroo.Agent`](https://www.nuget.org/packages/Klyroo.Agent) | `AgentBridgeService`, `AddKlyrooAgent()`, and the browser runtime served from `_content/Klyroo.Agent/`. Depends on `Klyroo.Agent.Core`, `Klyroo.Form.Core`, `Klyroo.Dashboard.Core` and `Klyroo.Spreadsheet.Core`. |
-| [`@klyroo/agent`](packages/agent/README.md) | Source of the browser runtime (npm package manifest). Not published to npm; the same file ships inside `Klyroo.Agent`. |
+| [`@klyroo/agent`](https://github.com/klyroo/klyroo-agent/blob/main/packages/agent/README.md) | Source of the browser runtime (npm package manifest). Not published to npm; the same file ships inside `Klyroo.Agent`. |
 
 ## Prerequisites
 
@@ -39,7 +39,7 @@ To use the library in an app:
 - **An AI host that calls your code**: the bridge exposes `snapshot`, `query` and `act` as methods and tool definitions; your MCP server, chat endpoint or tool loop calls them. The library does not call a model itself.
 - **For the browser runtime** (`klyroo-agent.js`): a browser with ES modules, the static web assets of the app served (`MapStaticAssets` or `UseStaticFiles`), and, for `registerWebMcp`, a browser that exposes the WebMCP `modelContext` API, which is still experimental.
 
-To build this repository you need the .NET 10 SDK (a newer SDK works too, see `global.json`) and clones of `klyroo-dashboard`, `klyroo-form` and `klyroo-spreadsheet` in the same parent folder: some projects reference them by relative path (`../klyroo-dashboard/...`). See [Contributing](CONTRIBUTING.md).
+To build this repository you need the .NET 10 SDK (a newer SDK works too, see `global.json`) and clones of `klyroo-dashboard`, `klyroo-form` and `klyroo-spreadsheet` in the same parent folder: some projects reference them by relative path (`../klyroo-dashboard/...`). See [Contributing](https://github.com/klyroo/klyroo-agent/blob/main/CONTRIBUTING.md).
 
 ## Installation
 
@@ -112,18 +112,18 @@ Console.WriteLine(result.Ok ? "done" : result.Error);
 ```
 
 In a Blazor component, inject the scoped service instead of creating one, as shown in
-[Getting started](docs/getting-started.md).
+[Getting started](https://github.com/klyroo/klyroo-agent/blob/main/docs/getting-started.md).
 
 ## Documentation
 
 | | |
 | :--- | :--- |
-| [Getting started](docs/getting-started.md) | Step-by-step first integration |
-| [Guides](docs/guides.md) | Task-oriented recipes |
-| [Concepts](docs/concepts.md) | How the library works |
-| [Platforms](docs/platforms.md) | Render modes, .NET MAUI, NativeAOT |
-| [API reference](docs/api-reference.md) | Every public type and member |
-| [FAQ](docs/faq.md) | Troubleshooting and limitations |
+| [Getting started](https://github.com/klyroo/klyroo-agent/blob/main/docs/getting-started.md) | Step-by-step first integration |
+| [Guides](https://github.com/klyroo/klyroo-agent/blob/main/docs/guides.md) | Task-oriented recipes |
+| [Concepts](https://github.com/klyroo/klyroo-agent/blob/main/docs/concepts.md) | How the library works |
+| [Platforms](https://github.com/klyroo/klyroo-agent/blob/main/docs/platforms.md) | Render modes, .NET MAUI, NativeAOT |
+| [API reference](https://github.com/klyroo/klyroo-agent/blob/main/docs/api-reference.md) | Every public type and member |
+| [FAQ](https://github.com/klyroo/klyroo-agent/blob/main/docs/faq.md) | Troubleshooting and limitations |
 
 ## Compatibility
 
@@ -151,9 +151,9 @@ Klyroo is a family of independent .NET libraries that compose. Each one has its 
 
 ## Contributing
 
-Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and follow the
-[code of conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in [SECURITY.md](SECURITY.md).
+Contributions are welcome. Read [CONTRIBUTING.md](https://github.com/klyroo/klyroo-agent/blob/main/CONTRIBUTING.md) before opening a pull request, and follow the
+[code of conduct](https://github.com/klyroo/klyroo-agent/blob/main/CODE_OF_CONDUCT.md). Report security issues privately as described in [SECURITY.md](https://github.com/klyroo/klyroo-agent/blob/main/SECURITY.md).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/klyroo/klyroo-agent/blob/main/LICENSE)

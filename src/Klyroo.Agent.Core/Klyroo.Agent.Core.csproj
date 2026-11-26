@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Klyroo.Agent</RootNamespace>
     <PackageId>Klyroo.Agent.Core</PackageId>
+    <PackageTags>klyroo;ai;agents;tools;mcp;headless;nativeaot</PackageTags>
     <Description>Klyroo Agent Core: models of the agent bridge (snapshot, query, act, observe) and UndoStack. No dependencies, NativeAOT compatible.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsTrimmable>true</IsTrimmable>
