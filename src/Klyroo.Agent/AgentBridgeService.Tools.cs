@@ -145,7 +145,13 @@ public sealed partial class AgentBridgeService
         value = 0;
         error = null;
         if (!obj.TryGetProperty(name, out var element) || element.ValueKind == JsonValueKind.Null) return true;
-        if (element.ValueKind == JsonValueKind.Number && element.TryGetInt32(out value)) return true;
+        // 25.0 is a whole number too, as the schema says "integer".
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetDecimal(out var number)
+            && number == decimal.Truncate(number) && number is >= int.MinValue and <= int.MaxValue)
+        {
+            value = (int)number;
+            return true;
+        }
         error = $"\"{name}\" must be a whole number.";
         return false;
     }

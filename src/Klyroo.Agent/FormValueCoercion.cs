@@ -120,6 +120,7 @@ internal static class FormValueCoercion
         null => "no value",
         string text => $"\"{text}\"",
         System.Collections.IEnumerable and not string => "a list",
+        _ when AgentArgs.IsNumber(arg) => AgentArgs.NumberText(arg!),
         _ => Convert.ToString(arg, CultureInfo.InvariantCulture) ?? "an unsupported value",
     };
 
@@ -132,7 +133,7 @@ internal static class FormValueCoercion
         {
             string s => s,
             bool or System.Collections.IEnumerable => null,
-            _ when IsNumeric(arg) => Convert.ToString(arg, CultureInfo.InvariantCulture),
+            _ when AgentArgs.IsNumber(arg) => AgentArgs.NumberText(arg),
             _ => null,
         };
         if (text is null)
@@ -148,9 +149,6 @@ internal static class FormValueCoercion
         value = text;
         return true;
     }
-
-    private static bool IsNumeric(object arg) =>
-        arg is double or float or decimal or int or long or short or byte or sbyte or uint or ulong or ushort;
 
     private static bool TryBool(object? arg, out bool result)
     {
@@ -171,7 +169,7 @@ internal static class FormValueCoercion
                 }
                 return false;
             default:
-                if (arg is not null && IsNumeric(arg) && TryDouble(arg, out var number) && number is 0 or 1)
+                if (arg is not null && AgentArgs.IsNumber(arg) && AgentArgs.TryDouble(arg, out var number) && number is 0 or 1)
                 {
                     result = number == 1;
                     return true;
@@ -180,30 +178,12 @@ internal static class FormValueCoercion
         }
     }
 
-    private static bool TryDouble(object arg, out double number)
-    {
-        number = 0;
-        switch (arg)
-        {
-            case string s:
-                // Invariant culture, no thousands separators: "1,5" is rejected instead of read as 15.
-                return double.TryParse(s.Trim(), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent,
-                    CultureInfo.InvariantCulture, out number) && double.IsFinite(number);
-            case bool:
-                return false;
-            default:
-                if (!IsNumeric(arg)) return false;
-                number = Convert.ToDouble(arg, CultureInfo.InvariantCulture);
-                return double.IsFinite(number);
-        }
-    }
-
     private static bool TryNumber(FormFieldSchema field, object? arg, out object? value, out string? error)
     {
         value = null;
         error = null;
         if (arg is null || arg is string { Length: 0 }) return true;
-        if (!TryDouble(arg, out var number))
+        if (!AgentArgs.TryDouble(arg, out var number))
         {
             error = $"\"{field.Key}\" expects a finite number (invariant format such as 12.5), got {Describe(arg)}.";
             return false;
@@ -397,7 +377,7 @@ internal static class FormValueCoercion
             {
                 string s => s,
                 bool => null,
-                not null when IsNumeric(item) => Convert.ToString(item, CultureInfo.InvariantCulture),
+                not null when AgentArgs.IsNumber(item) => AgentArgs.NumberText(item),
                 _ => null,
             };
             FormOptionItem? option = null;

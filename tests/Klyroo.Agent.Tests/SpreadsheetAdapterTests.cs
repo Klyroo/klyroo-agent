@@ -443,4 +443,29 @@ public sealed class SpreadsheetAdapterTests
         Assert.Contains("6000, 6001", unknown.Error);
         Assert.Empty(importer.DiscardedRows);
     }
+
+    [Fact]
+    public async Task A_cell_gets_the_exact_digits_of_a_JSON_number_and_whole_numbers_may_be_written_25_0()
+    {
+        var (agent, importer, _, _) = Setup();
+
+        var edit = await Act(agent, "editCell", Json("3.0"), "name", Json("12345678901234567890"));
+        Assert.True(edit.Ok, edit.Error);
+        Assert.Equal("12345678901234567890", importer.AllRows[1].Cells["name"].Text);
+
+        var huge = await Act(agent, "editCell", Json("2"), "name", Json("123456789012345678901234567890123456789"));
+        Assert.True(huge.Ok, huge.Error);
+        Assert.Equal("123456789012345678901234567890123456789", importer.AllRows[0].Cells["name"].Text);
+
+        var decimalText = await Act(agent, "editCell", 4, "name", Json("1.50"));
+        Assert.True(decimalText.Ok, decimalText.Error);
+        Assert.Equal("1.50", importer.AllRows[2].Cells["name"].Text);
+
+        var discard = await Act(agent, "discardRows", Json("[2.0, 4]"));
+        Assert.True(discard.Ok, discard.Error);
+        Assert.Equal([2, 4], importer.DiscardedRows.Select(r => r.RowNumber).Order());
+
+        var page = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "rows", Limit = 25 }));
+        Assert.Equal(3, page.Total);
+    }
 }

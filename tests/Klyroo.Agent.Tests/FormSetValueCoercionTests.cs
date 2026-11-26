@@ -408,4 +408,49 @@ public sealed class FormSetValueCoercionTests
         Assert.False(result.Ok);
         Assert.Contains("no value to clear", result.Error);
     }
+
+    [Theory]
+    [InlineData("12345678901234567890", "12345678901234567890")]
+    [InlineData("9223372036854775807", "9223372036854775807")]
+    [InlineData("-42", "-42")]
+    [InlineData("1.50", "1.50")]
+    [InlineData("0.1000000000000000055511151231257827", "0.1000000000000000055511151231257827")]
+    [InlineData("123456789012345678901234567890123456789", "123456789012345678901234567890123456789")]
+    [InlineData("1e3", "1e3")]
+    [InlineData("-0.0", "-0.0")]
+    public async Task A_text_field_gets_the_exact_digits_of_a_JSON_number(string json, string expected)
+    {
+        var (agent, form) = Setup(new FormFieldSchema { Key = "f", Label = "F" });
+
+        var result = await Set(agent, Json(json));
+
+        Assert.True(result.Ok, result.Error);
+        Assert.Equal(expected, form.GetValue("f"));
+    }
+
+    [Fact]
+    public async Task A_numeric_field_still_stores_a_double_for_large_and_fractional_numbers()
+    {
+        var (agent, form) = Setup(new FormFieldSchema { Key = "f", Label = "F", Kind = FormFieldKind.Number });
+        Assert.True((await Set(agent, Json("9223372036854775807"))).Ok);
+        Assert.Equal(9223372036854775807d, form.GetValue("f"));
+        Assert.True((await Set(agent, Json("0.1"))).Ok);
+        Assert.Equal(0.1, form.GetValue("f"));
+        Assert.True((await Set(agent, Json("1e3"))).Ok);
+        Assert.Equal(1000.0, form.GetValue("f"));
+        Assert.True((await Set(agent, Json("123456789012345678901234567890123456789"))).Ok);
+        Assert.Equal(1.2345678901234568e38, form.GetValue("f"));
+        var overflow = await Set(agent, Json("1e400"));
+        Assert.False(overflow.Ok);
+        Assert.Equal(1.2345678901234568e38, form.GetValue("f"));
+    }
+
+    [Fact]
+    public async Task A_number_matches_an_option_by_its_exact_text()
+    {
+        var (agent, form) = Setup(new FormFieldSchema { Key = "f", Label = "F", Kind = FormFieldKind.Select, Options = [new("1", "One"), new("20", "Twenty")] });
+        Assert.True((await Set(agent, Json("20"))).Ok);
+        Assert.Equal("20", form.GetValue("f"));
+        Assert.False((await Set(agent, Json("2"))).Ok);
+    }
 }

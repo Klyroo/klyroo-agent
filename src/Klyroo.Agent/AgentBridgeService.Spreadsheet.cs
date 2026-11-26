@@ -279,7 +279,7 @@ public sealed partial class AgentBridgeService
                 if (column is null) return StepResult.Fail($"\"{AgentArgs.Text(args, 0)}\" is not a column of this import. Use query with collection \"columns\".");
                 if (!importer.FileLoaded) return StepResult.Fail("no file is loaded.");
                 int headerIndex;
-                if (args.Count > 1 && args[1] is double or int && AgentArgs.TryInt(args[1], out headerIndex))
+                if (args.Count > 1 && args[1] is not string && AgentArgs.IsNumber(args[1]) && AgentArgs.TryInt(args[1], out headerIndex))
                 {
                     if (headerIndex < 0 || headerIndex >= importer.Headers.Count)
                         return StepResult.Fail($"the file has no column with index {headerIndex}. Use query with collection \"headers\".");
@@ -321,8 +321,8 @@ public sealed partial class AgentBridgeService
                 {
                     null => "",
                     string s => s,
-                    double d => d.ToString(CultureInfo.InvariantCulture),
                     bool b => b ? "true" : "false",
+                    { } n when AgentArgs.IsNumber(n) => AgentArgs.NumberText(n), // the digits as sent: 12345678901234567890 stays that text
                     _ => null,
                 };
                 if (text is null) return StepResult.Fail("the cell text must be text, a number or a boolean.");

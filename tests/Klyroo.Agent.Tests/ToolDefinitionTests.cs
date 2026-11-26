@@ -190,4 +190,19 @@ public sealed class ToolDefinitionTests
         Assert.True(result.Ok, result.Error);
         Assert.Equal(["amer", "emea"], region.Values.OrderBy(v => v));
     }
+
+    [Fact]
+    public async Task Limit_and_offset_written_as_25_0_are_whole_numbers()
+    {
+        var importer = new SpreadsheetImporter(new SpreadsheetSchema { Key = "rows", Columns = [new SpreadsheetColumnSchema { Key = "a", Label = "A" }] });
+        importer.LoadText("A\n1\n2\n3", "r.csv");
+        var agent = new AgentBridgeService();
+        agent.RegisterSpreadsheet(importer);
+
+        var result = Assert.IsAssignableFrom<IReadOnlyList<AgentQueryMatch>>(await agent.InvokeToolAsync("query",
+            Json("""{ "within": "rows", "collection": "rows", "limit": 2.0, "offset": 1.0 }""")));
+
+        Assert.Equal([3, 4], Assert.Single(result).Records!.Select(r => (int)r["rowNumber"]!));
+        Assert.IsType<AgentToolError>(await agent.InvokeToolAsync("query", Json("""{ "limit": 2.5 }""")));
+    }
 }
