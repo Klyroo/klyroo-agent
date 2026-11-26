@@ -163,9 +163,17 @@ public sealed partial class AgentBridgeService
                 switch (action)
                 {
                     case "setView":
-                        if (args.Count == 0 || args[0] is null) return false;
-                        dashboard.CurrentView = args[0]!.ToString();
-                        return true;
+                    {
+                        var key = AgentArgs.Text(args, 0);
+                        if (string.IsNullOrEmpty(key)) return StepResult.Fail("give the key of the view.");
+                        var wanted = dashboard.Views.FirstOrDefault(v => string.Equals(v.Key, key, StringComparison.Ordinal));
+                        if (wanted is null) return StepResult.Fail($"\"{key}\" is not an enabled view. Use query on the dashboard to list them.");
+                        dashboard.CurrentView = key;
+                        // The controller decides what can become current, so the result is read back instead of assumed.
+                        return string.Equals(dashboard.CurrentView, key, StringComparison.Ordinal)
+                            ? true
+                            : StepResult.Fail($"the view \"{key}\" could not be selected.");
+                    }
                     case "resetFilters":
                         dashboard.ResetFilters();
                         return true;
