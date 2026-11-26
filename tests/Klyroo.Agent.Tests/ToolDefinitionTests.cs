@@ -107,12 +107,15 @@ public sealed class ToolDefinitionTests
     [Fact]
     public async Task InvokeTool_snapshot_honors_includeOffPage_and_query_reads_all_its_arguments()
     {
-        var (agent, _) = Bridge();
+        var (agent, form) = Bridge();
 
         var visible = Assert.IsAssignableFrom<IReadOnlyList<AgentComponentSnapshot>>(await agent.InvokeToolAsync("snapshot", Json("""{ "includeOffPage": false }""")));
         Assert.DoesNotContain(visible, c => c.Label == "Note");
         var all = Assert.IsAssignableFrom<IReadOnlyList<AgentComponentSnapshot>>(await agent.InvokeToolAsync("snapshot", default));
-        Assert.Contains(all, c => c.Label == "Note");
+        Assert.DoesNotContain(all, c => c.Label == "Note"); // its condition is false, so it is not in effect
+        form.SetValue("qty", 9.0);
+        var after = Assert.IsAssignableFrom<IReadOnlyList<AgentComponentSnapshot>>(await agent.InvokeToolAsync("snapshot", default));
+        Assert.Contains(after, c => c.Label == "Note");
 
         var choices = Assert.IsAssignableFrom<IReadOnlyList<AgentQueryMatch>>(await agent.InvokeToolAsync("query", Json("""{ "within": "Toppings", "text": "oliv" }""")));
         Assert.Equal("olives", Assert.Single(Assert.Single(choices).Items).Value);

@@ -36,7 +36,10 @@ public sealed partial class AgentBridgeService
         public required Func<IReadOnlyList<AgentChoiceItem>> GetChoices { get; init; }
         public required Func<string, IReadOnlyList<object?>, Task<StepResult>> ExecuteAction { get; init; }
         public Func<bool>? IsDisabled { get; init; }
+        /// <summary>In effect but not shown now, such as a field of another step. Listed only when the caller asks for off-page components.</summary>
         public Func<bool>? IsOffPage { get; init; }
+        /// <summary>Not in effect: the field is hidden by a condition, a hidden container, section or tab, or a skipped step. It is neither readable nor writable.</summary>
+        public Func<bool>? IsHidden { get; init; }
         public bool Sensitive { get; init; }
         public bool ConfirmRequired { get; init; }
         /// <summary>The actions that need confirmation even when <see cref="ConfirmRequired"/> is false.</summary>
@@ -239,6 +242,7 @@ public sealed partial class AgentBridgeService
         var results = new List<AgentComponentSnapshot>();
         foreach (var t in _targets)
         {
+            if (t.IsHidden?.Invoke() == true) continue;
             var offPage = t.IsOffPage?.Invoke() ?? false;
             if (!includeOffPage && offPage) continue;
             var val = t.Sensitive ? RedactedValue : t.GetValue();
@@ -275,7 +279,7 @@ public sealed partial class AgentBridgeService
             var target = _targets.FirstOrDefault(t =>
                 string.Equals(t.Ref, req.Within, StringComparison.OrdinalIgnoreCase)
                 || Normalize(t.Label) == normWithin);
-            if (target is null) return [];
+            if (target is null || IsUnreachable(target)) return [];
 
             if (!string.IsNullOrWhiteSpace(req.Collection))
             {
@@ -305,6 +309,7 @@ public sealed partial class AgentBridgeService
         var matches = new List<AgentQueryMatch>();
         foreach (var t in _targets)
         {
+            if (IsUnreachable(t)) continue;
             if (!string.IsNullOrEmpty(normKind) && Normalize(t.Component) != normKind) continue;
             var choices = t.GetChoices();
             var matchedChoices = string.IsNullOrEmpty(normText)
@@ -369,7 +374,7 @@ public sealed partial class AgentBridgeService
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: component \"{target.Label}\" ({target.Ref}) is disabled.");
             }
-            if (target.IsOffPage?.Invoke() == true)
+            if (target.IsHidden?.Invoke() == true)
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: component \"{target.Label}\" ({target.Ref}) is not displayed right now.");
             }
@@ -439,6 +444,9 @@ public sealed partial class AgentBridgeService
 
         return new AgentActResult(true, outcomes, values);
     }
+
+    // Query has no includeOffPage flag, so it only describes components that are in effect and shown.
+    private static bool IsUnreachable(BoundTarget t) => t.IsHidden?.Invoke() == true || t.IsOffPage?.Invoke() == true;
 
     private void EmitObservedChange(ObservedChange change)
     {

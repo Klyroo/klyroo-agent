@@ -26,7 +26,7 @@ public sealed class BridgeActionRulesTests
             Fields = [new FormFieldSchema { Key = "name", Label = "Name" }],
             OnSubmit = _ => throw new InvalidOperationException("database down"),
         });
-        agent.RegisterForm(form);
+        agent.RegisterForm(form, confirmSubmit: false);
 
         var result = await agent.ActAsync([new AgentActStep("Profile", "submit")]);
 

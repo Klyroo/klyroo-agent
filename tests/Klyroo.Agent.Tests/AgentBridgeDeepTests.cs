@@ -36,12 +36,14 @@ public sealed class AgentBridgeDeepTests
             ]
         });
 
-        agent.RegisterForm(wizard);
+        agent.RegisterForm(wizard, confirmSubmit: false);
 
-        // Off-page / conditional field excluded when includeOffPage=false
-        var visibleOnly = agent.Snapshot(includeOffPage: false);
-        Assert.DoesNotContain(visibleOnly, s => s.Label == "Hidden Note");
-        Assert.Contains(agent.Snapshot(includeOffPage: true), s => s.Label == "Hidden Note");
+        // A field whose condition is false is not in effect: it is not listed at all, off-page flag or not.
+        Assert.DoesNotContain(agent.Snapshot(includeOffPage: false), s => s.Label == "Hidden Note");
+        Assert.DoesNotContain(agent.Snapshot(includeOffPage: true), s => s.Label == "Hidden Note");
+        // A field of another step that is in effect is listed only when off-page components are asked for.
+        Assert.DoesNotContain(agent.Snapshot(includeOffPage: false), s => s.Label == "Accepted");
+        Assert.True(Assert.Single(agent.Snapshot(includeOffPage: true), s => s.Label == "Accepted").OffPage);
 
         // Toggle checkbox -> Hidden Note becomes visible; clear & reset org; navigate steps
         var act1 = await agent.ActAsync([
