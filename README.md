@@ -30,6 +30,17 @@ in a console app.
 | [`Klyroo.Agent`](https://www.nuget.org/packages/Klyroo.Agent) | `AgentBridgeService`, `AddKlyrooAgent()`, and the browser runtime served from `_content/Klyroo.Agent/`. Depends on `Klyroo.Agent.Core`, `Klyroo.Form.Core`, `Klyroo.Dashboard.Core` and `Klyroo.Spreadsheet.Core`. |
 | [`@klyroo/agent`](packages/agent/README.md) | Source of the browser runtime (npm package manifest). Not published to npm; the same file ships inside `Klyroo.Agent`. |
 
+## Prerequisites
+
+To use the library in an app:
+
+- **The .NET 10 SDK**, and an app that targets `net10.0`. The packages are prereleases, so every `dotnet add package` command needs `--prerelease`.
+- **The controllers you expose**: `Klyroo.Agent` references the `Klyroo.Form.Core`, `Klyroo.Dashboard.Core` and `Klyroo.Spreadsheet.Core` packages, so the bridge works with any app that builds a `FormController`, `DashboardController` or `SpreadsheetImporter`, rendered or not. Register it with `AddKlyrooAgent()`.
+- **An AI host that calls your code**: the bridge exposes `snapshot`, `query` and `act` as methods and tool definitions; your MCP server, chat endpoint or tool loop calls them. The library does not call a model itself.
+- **For the browser runtime** (`klyroo-agent.js`): a browser with ES modules, the static web assets of the app served (`MapStaticAssets` or `UseStaticFiles`), and, for `registerWebMcp`, a browser that exposes the WebMCP `modelContext` API, which is still experimental.
+
+To build this repository you need the .NET 10 SDK (a newer SDK works too, see `global.json`) and clones of `klyroo-dashboard`, `klyroo-form`, `klyroo-spreadsheet` in the same parent folder: some projects reference them by relative path (`../klyroo-dashboard/...`). See [Contributing](CONTRIBUTING.md).
+
 ## Installation
 
 ```bash
@@ -114,7 +125,7 @@ In a Blazor component, inject the scoped service instead of creating one, as sho
 | [API reference](docs/api-reference.md) | Every public type and member |
 | [FAQ](docs/faq.md) | Troubleshooting and limitations |
 
-## Requirements
+## Compatibility
 
 - .NET 10 SDK.
 - `Klyroo.Agent.Core` declares `IsAotCompatible` and `IsTrimmable`, so it works in NativeAOT and trimmed apps.

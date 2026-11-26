@@ -3,6 +3,8 @@
 By the end of this page an agent-style caller will read and edit a form through `AgentBridgeService`, first in a
 console app and then inside a Blazor component.
 
+Check the [prerequisites](../README.md#prerequisites) first: the .NET 10 SDK, and for the components a Blazor app with Klyroo.UI set up.
+
 ## 1. Install
 
 ```bash
