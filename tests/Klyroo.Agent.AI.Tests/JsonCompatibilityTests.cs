@@ -11,6 +11,8 @@ namespace Klyroo.Agent.AI.Tests;
 /// same text, byte for byte. The calls run in order on one bridge, so each one sees what the earlier ones changed.
 /// One value differs on purpose: the untyped bridge reported <c>selected: false</c> for every option of a multiple choice (it compared
 /// the text of the list with the option), so <c>query-all.json</c> was edited by hand to <c>selected: true</c> for the chosen option "cheese".
+/// A second value differs on purpose: the untyped bridge let the model write the password field "Secret", the typed one refuses it unless the application opts in
+/// (<c>allowSensitiveWrites</c>), so <c>act-form-ok.json</c> ends with the refusal of step 6 instead of a successful write.
 /// </summary>
 public sealed class JsonCompatibilityTests
 {

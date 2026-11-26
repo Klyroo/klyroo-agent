@@ -63,12 +63,12 @@ public sealed class TypedFormBridgeTests
 
     private static FormField<Account, IReadOnlyList<string>> Tags(FormController<Account> form) => TagHandles.TryGetValue(form.Schema, out var handle) ? handle : throw new InvalidOperationException();
 
-    private static (AgentBridgeService Agent, FormController<Account> Form, FormSchema<Account> Schema) Setup(bool confirmSubmit = false)
+    private static (AgentBridgeService Agent, FormController<Account> Form, FormSchema<Account> Schema) Setup(bool confirmSubmit = false, IReadOnlyCollection<string>? allowSensitiveWrites = null)
     {
         var schema = Schema();
         var form = new FormController<Account>(schema, new Account());
         var agent = new AgentBridgeService();
-        agent.RegisterForm(form, confirmSubmit);
+        agent.RegisterForm(form, confirmSubmit, allowSensitiveWrites);
         return (agent, form, schema);
     }
 
@@ -165,7 +165,7 @@ public sealed class TypedFormBridgeTests
     [Fact]
     public async Task Sensitive_fields_are_never_exposed_in_a_snapshot_a_result_or_an_observed_change()
     {
-        var (agent, form, _) = Setup();
+        var (agent, form, _) = Setup(allowSensitiveWrites: ["Password"]);
         var observed = new List<ObservedChange>();
         using var subscription = agent.Observe(observed.Add);
 

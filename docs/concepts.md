@@ -56,7 +56,8 @@ first check that fails:
 A form field that is not in effect refuses every step and is absent from `Snapshot` and `Query`. "In effect" is the rule
 `IFormFieldAccess.IsHidden` reports, the rule `ActiveFields` applies to the form output: the field's condition is true, its containers, tab and section
 are visible, and its step is the current one or is not skipped. A field of another step that is in effect is listed only by
-`Snapshot(includeOffPage: true)`, flagged `OffPage`, and `Query` leaves it out. A call carries at most
+`Snapshot(includeOffPage: true)`, flagged `OffPage`, and `Query` leaves it out. A write to it (`setValue`, `toggle`, `clear`,
+`reset`) is refused with a reason that tells the model to use `nextStep`, which validates the current step like a user. A call carries at most
 `AgentBridgeService.MaxStepsPerAct` (50) steps; a longer list fails before any step runs.
 
 Failures are values, not exceptions: you get `Ok = false` and an `Error` message that names the step number, the
@@ -142,9 +143,12 @@ appear.
 
 Password and one-time-code form fields are marked sensitive at registration. Their value is replaced with
 `AgentBridgeService.RedactedValue` in snapshots, in `AgentActResult.Values`, in step outcomes and in both
-`Previous` and `Value` of observed changes. The agent can still write to such a field with `setValue`, but it can
-never read the value back through the bridge. Redaction is by field kind; a regular text field that happens to hold
-a secret is not redacted.
+`Previous` and `Value` of observed changes. The model can neither read nor write such a field: `ActAsync` refuses
+every action on it with a reason that does not reveal the value, before any policy is asked. The application opts in per
+field, for one registered form, with `RegisterForm(form, allowSensitiveWrites: ["Password"])`, which takes the
+`IFormFieldAccess.Key` of each field (the member name of a typed form, the `Key` of a dynamic field). The opt-in allows
+writes only, the value stays `[redacted]` in every output. Redaction is by field kind; a regular text field that happens
+to hold a secret is not redacted.
 
 ## Two packages
 

@@ -57,7 +57,7 @@ approves them to get the old behavior. See [Require approval before consequentia
 **`Snapshot` is missing components**
 
 `Snapshot` returns at most 100 components. Stateless form fields (`Info`, `Divider`, `Section`, `Button`) are never
-registered, hidden inputs are never registered, fields that are not in effect (condition false, hidden container, tab or section, skipped step) are left out, and fields of another step appear only with `includeOffPage`. Dashboard filters marked headless are skipped.
+registered, hidden inputs are never registered, fields that are not in effect (condition false, hidden container, tab or section, skipped step) are left out, and fields of another step appear only with `includeOffPage` and cannot be written until `nextStep` brings their step up. Dashboard filters marked headless are skipped.
 
 **An observer does not fire when a user edits a field**
 
@@ -99,5 +99,7 @@ Keeping it out of `Klyroo.Agent.Core` leaves that package free of dependencies.
 
 **Can an agent read a password field?**
 
-No. Password and one-time-code fields report `[redacted]` in every output. The agent can overwrite them with
-`setValue`.
+No. Password and one-time-code fields report `[redacted]` in every output, and `ActAsync` refuses every write to them
+(`setValue`, `clear`, `toggle`, `reset`) with a reason that does not reveal the value, so the model can neither read nor
+overwrite them. To let it type a value, such as a one-time code you want it to fill, name the field when you register the
+form: `RegisterForm(form, allowSensitiveWrites: ["Code"])`. The opt-in allows writes only; reads stay redacted.

@@ -52,7 +52,9 @@ var result = await agent.ActAsync(
 Goal: let an agent fill a stepped form and move between its steps.
 
 A form built from `Steps` exposes `nextStep` and `previousStep` on the form component. Fields of the current step
-are listed; fields of another step that is in effect appear only with `Snapshot(includeOffPage: true)`, flagged `OffPage`.
+are listed; fields of another step that is in effect appear only with `Snapshot(includeOffPage: true)`, flagged `OffPage`,
+and refuse every write (`setValue`, `toggle`, `clear`, `reset`) with a reason that points to `nextStep`. The agent fills the
+current step, calls `nextStep`, which validates the step like a user pressing Next, and then writes the fields of the next one.
 A field that is not in effect, because its `VisibleWhen` condition is false (`Condition` on a dynamic schema), its container or tab is hidden, or its step is skipped, is
 absent and refuses every step, a disabled field refuses every step too, and hidden inputs are never exposed.
 
@@ -367,7 +369,8 @@ Each tool call runs on the server inside the circuit, so a field the assistant s
 `Changed` event of its controller, as long as the page calls `InvokeAsync(StateHasChanged)` from it, as the component in
 [Getting started](getting-started.md#5-use-it-from-blazor) does. The user sees the form change while the assistant
 works, and a submit waits for the Approve button. Register `Observe` as shown below to keep an audit trail of what the
-assistant changed. The model never reads a password field: it is `[redacted]` in every result.
+assistant changed. The model never reads a password field: it is `[redacted]` in every result, and it cannot write one
+either unless you allow it (see [Secrets](concepts.md#secrets)).
 
 ## Log what the agent changed
 

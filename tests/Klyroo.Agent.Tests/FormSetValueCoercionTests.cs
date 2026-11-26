@@ -14,11 +14,11 @@ public sealed class FormSetValueCoercionTests
 
     private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
-    private static (AgentBridgeService Agent, DynamicFormController Form) Setup(DynamicFieldSchema field)
+    private static (AgentBridgeService Agent, DynamicFormController Form) Setup(DynamicFieldSchema field, IReadOnlyCollection<string>? allowSensitiveWrites = null)
     {
         var agent = new AgentBridgeService();
         var form = new DynamicFormController(new DynamicFormSchema { FormKey = "f", Title = "Form", Fields = [field] });
-        agent.RegisterForm(form);
+        agent.RegisterForm(form, allowSensitiveWrites: allowSensitiveWrites);
         return (agent, form);
     }
 
@@ -358,7 +358,7 @@ public sealed class FormSetValueCoercionTests
     [Fact]
     public async Task Sensitive_text_fields_still_redact_after_a_coerced_set()
     {
-        var (agent, form) = Setup(new DynamicFieldSchema { Key = "f", Label = "F", Kind = FormFieldKind.Password });
+        var (agent, form) = Setup(new DynamicFieldSchema { Key = "f", Label = "F", Kind = FormFieldKind.Password }, allowSensitiveWrites: ["f"]);
         var result = await Set(agent, Json("\"s3cret!\""));
         Assert.True(result.Ok);
         Assert.Equal("s3cret!", form.GetValue("f"));

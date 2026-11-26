@@ -49,7 +49,7 @@ public sealed class AgentUiSdkTests
         };
 
         var form = new DynamicFormController(formSchema);
-        agent.RegisterForm(form, confirmSubmit: true);
+        agent.RegisterForm(form, confirmSubmit: true, allowSensitiveWrites: ["apiToken"]);
 
         var dashboard = new DashboardController("sales");
         dashboard.AddFilter(new DashboardFilterControl(

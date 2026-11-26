@@ -45,6 +45,8 @@ public sealed partial class AgentBridgeService
         /// <summary>Not in effect: the field is hidden by a condition, a hidden container, section or tab, or a skipped step. It is neither readable nor writable.</summary>
         public Func<bool>? IsHidden { get; init; }
         public bool Sensitive { get; init; }
+        /// <summary>Says why an action is refused before it runs (the value is never part of the reason), or <see langword="null"/> when it may run.</summary>
+        public Func<string, string?>? RefuseAction { get; init; }
         public bool ConfirmRequired { get; init; }
         /// <summary>The actions that need confirmation even when <see cref="ConfirmRequired"/> is false.</summary>
         public IReadOnlyList<string> ConfirmActions { get; init; } = [];
@@ -355,7 +357,8 @@ public sealed partial class AgentBridgeService
     /// <summary>
     /// Runs the steps in order. A step is resolved by reference or by label (case and accent insensitive), then
     /// checked for existence, ambiguity, disabled state, visibility (a component that is not displayed, such as a
-    /// conditional field whose condition is false, is refused) and supported action, then passed to
+    /// conditional field whose condition is false, is refused), supported action and the component's own refusals (a write to
+    /// a sensitive form field that was not opted in, a write to a field of another step), then passed to
     /// <see cref="AllowPolicy"/> and <paramref name="allow"/>. The first failing step stops the run; steps that
     /// already ran are not rolled back. Each successful step raises one <see cref="ObservedChange"/>. Failures,
     /// including an exception thrown while the action runs, are reported in <see cref="AgentActResult.Error"/>
@@ -407,6 +410,13 @@ public sealed partial class AgentBridgeService
             if (!target.Actions.Contains(step.Action, StringComparer.Ordinal))
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" is not supported by \"{target.Label}\" ({target.Ref}).");
+            }
+
+            // Before the policy: a person must not be asked about a step that is going to be refused anyway.
+            var refusal = target.RefuseAction?.Invoke(step.Action);
+            if (refusal is not null)
+            {
+                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" ({target.Ref}) was refused: {refusal}");
             }
 
             var needsConfirmation = target.NeedsConfirmation(step.Action);

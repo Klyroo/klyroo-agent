@@ -10,11 +10,13 @@ public sealed partial class AgentBridgeService
     /// <see cref="IFormRuntime"/>, so a typed <c>FormController&lt;TModel&gt;</c> and a <c>DynamicFormController</c> are exposed the same
     /// way. Fields become <c>input</c>, <c>select</c>, <c>checkbox</c> or <c>number</c> components; the form accepts
     /// <c>submit</c>, <c>reset</c> and, for stepped forms, <c>nextStep</c> and <c>previousStep</c>. Password and
-    /// one-time-code fields are always redacted. Hidden inputs are never exposed. A field that is not in effect, because
+    /// one-time-code fields (any <see cref="IFormFieldAccess.Sensitive"/> field) are never readable, and ActAsync refuses every
+    /// write to them unless <paramref name="allowSensitiveWrites"/> names the field. Hidden inputs are never exposed. A field that is not in effect, because
     /// of its condition, a hidden container, section or tab, or a skipped step (<see cref="IFormFieldAccess.IsHidden"/>),
     /// is left out of <see cref="Snapshot"/> and <see cref="Query"/> and refuses every step. A field that is disabled
     /// refuses every step too, because the form itself would write to it. A field of another step that is in effect
-    /// is listed only when <see cref="Snapshot"/> is asked for off-page components.
+    /// is listed only when <see cref="Snapshot"/> is asked for off-page components, and refuses every write too: the model moves
+    /// to the step with <c>nextStep</c>, which validates the current step like a user would, then writes.
     /// Registering the same form twice creates duplicate labels, which <see cref="ActAsync"/> rejects as ambiguous.
     /// </summary>
     /// <param name="form">The form to expose: a <c>FormController&lt;TModel&gt;</c> or a <c>DynamicFormController</c>.</param>
@@ -24,15 +26,21 @@ public sealed partial class AgentBridgeService
     /// steps never needs confirmation. It is <see langword="true"/> by default, so a form is not submitted by an agent
     /// until a policy approves it; pass <see langword="false"/> to let an agent submit freely.
     /// </param>
+    /// <param name="allowSensitiveWrites">
+    /// The <see cref="IFormFieldAccess.Key"/> of the sensitive fields the model may write (compared case-sensitively), for
+    /// this form only. By default the model can neither read nor write a sensitive field. The opt-in allows writes only:
+    /// the value stays redacted in snapshots, results and observed changes. A key that names no sensitive field of the form is ignored.
+    /// </param>
     /// <returns>A handle that removes the form's components when disposed, for example when the form closes.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="form"/> is <see langword="null"/>.</exception>
-    public IDisposable RegisterForm(IFormRuntime form, bool confirmSubmit = true)
+    public IDisposable RegisterForm(IFormRuntime form, bool confirmSubmit = true, IReadOnlyCollection<string>? allowSensitiveWrites = null)
     {
         ArgumentNullException.ThrowIfNull(form);
         var added = new List<BoundTarget>();
         foreach (var field in form.Fields)
         {
             var isPassword = field.Sensitive;
+            var mayWriteSensitive = allowSensitiveWrites?.Contains(field.Key, StringComparer.Ordinal) == true;
             var componentKind = field.Kind switch
             {
                 FormFieldKind.Select or FormFieldKind.AutoComplete or FormFieldKind.Radio => "select",
@@ -57,6 +65,12 @@ public sealed partial class AgentBridgeService
                 IsDisabled = () => field.IsDisabled,
                 IsHidden = () => field.IsHidden,
                 IsOffPage = () => field.IsOffPage,
+                RefuseAction = _ =>
+                    isPassword && !mayWriteSensitive
+                        ? "the field is sensitive and the application does not let the AI model change it."
+                        : field.IsOffPage
+                            ? "the field belongs to another step of the form; move there with the form's nextStep action, which validates the current step like a user, then write it."
+                            : null,
                 GetValue = () => isPassword ? AgentValue.From(RedactedValue) : ReadValue(field),
                 Actions = actions,
                 GetChoices = () =>
