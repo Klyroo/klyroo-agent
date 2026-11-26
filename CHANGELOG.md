@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- A documentation site at https://klyroo.github.io/klyroo-agent/, built from `README.md` and `docs/` and published by `.github/workflows/docs.yml` (the build is `docs-site/` of klyroo-stack). `docs/site.yml` sets the title, tagline, install command, NuGet packages, order of the pages and accent color; the Markdown files themselves are read as they are.
 - `RegisterForm`, `RegisterDashboard` and `RegisterSpreadsheet` return a handle that removes the registered components when disposed.
 - `ObservedChange.Row` holds the row number of a spreadsheet `editCell` step.
 - A dashboard filter `setValue` accepts a list of values for a multiple filter.
