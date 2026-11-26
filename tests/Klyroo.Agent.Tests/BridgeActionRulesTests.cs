@@ -51,9 +51,11 @@ public sealed class BridgeActionRulesTests
         var bad = await agent.ActAsync([new AgentActStep("people", "editCell", ["first", "name", "X"])]);
         Assert.False(bad.Ok);
 
-        var good = await agent.ActAsync([new AgentActStep("people", "editCell", [1, "name", "Grace Hopper"])]);
+        // Row 3 of the file is the second data row: rows are addressed by the number the user sees, not by an index.
+        var good = await agent.ActAsync([new AgentActStep("people", "editCell", [3, "name", "Grace Hopper"])]);
         Assert.True(good.Ok, good.Error);
-        Assert.Equal("1", Assert.Single(observed).Row);
+        Assert.Equal("3", Assert.Single(observed).Row);
+        Assert.Equal("Grace Hopper", importer.AllRows[1].Cells["name"].Text);
     }
 
     [Fact]

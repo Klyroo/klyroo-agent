@@ -31,7 +31,7 @@ internal static class FormValueCoercion
     {
         value = null;
         error = null;
-        var arg = Unwrap(raw, out var unwrapError);
+        var arg = AgentArgs.Unwrap(raw, out var unwrapError);
         if (unwrapError is not null)
         {
             error = unwrapError;
@@ -93,39 +93,6 @@ internal static class FormValueCoercion
                     return false;
                 }
                 return TryText(field, arg, out value, out error);
-        }
-    }
-
-    // Turns a JsonElement into plain CLR values (string, double, bool, null, List<object?>) and leaves other values alone.
-    private static object? Unwrap(object? raw, out string? error)
-    {
-        error = null;
-        if (raw is not JsonElement element) return raw;
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Null:
-            case JsonValueKind.Undefined:
-                return null;
-            case JsonValueKind.String:
-                return element.GetString();
-            case JsonValueKind.True:
-                return true;
-            case JsonValueKind.False:
-                return false;
-            case JsonValueKind.Number:
-                return element.TryGetDouble(out var number) ? number : null;
-            case JsonValueKind.Array:
-                var list = new List<object?>();
-                foreach (var item in element.EnumerateArray())
-                {
-                    var inner = Unwrap(item, out error);
-                    if (error is not null) return null;
-                    list.Add(inner);
-                }
-                return list;
-            default:
-                error = "An object is not a valid value.";
-                return null;
         }
     }
 

@@ -23,6 +23,9 @@ public sealed partial class AgentBridgeService
         public static StepResult Fail(string reason) => new(false, reason);
     }
 
+    /// <summary>One page of a collection and the size of the whole filtered collection.</summary>
+    private sealed record RecordPage(IReadOnlyList<IReadOnlyDictionary<string, object?>> Records, int Total);
+
     private sealed class BoundTarget
     {
         public required string Ref { get; init; }
@@ -36,6 +39,12 @@ public sealed partial class AgentBridgeService
         public Func<bool>? IsOffPage { get; init; }
         public bool Sensitive { get; init; }
         public bool ConfirmRequired { get; init; }
+        /// <summary>The actions that need confirmation even when <see cref="ConfirmRequired"/> is false.</summary>
+        public IReadOnlyList<string> ConfirmActions { get; init; } = [];
+        /// <summary>Pages through a named collection of records, or <see langword="null"/> when the component has none.</summary>
+        public Func<AgentQueryRequest, RecordPage?>? QueryRecords { get; init; }
+
+        public bool NeedsConfirmation(string action) => ConfirmRequired || ConfirmActions.Contains(action, StringComparer.Ordinal);
         /// <summary>The row an action step addresses, for tabular components; reported as <see cref="ObservedChange.Row"/>.</summary>
         public Func<string, IReadOnlyList<object?>, string?>? RowOf { get; init; }
     }
@@ -244,7 +253,8 @@ public sealed partial class AgentBridgeService
                 t.Actions,
                 Disabled: t.IsDisabled?.Invoke() ?? false,
                 OffPage: offPage,
-                ConfirmRequired: t.ConfirmRequired));
+                ConfirmRequired: t.ConfirmRequired,
+                ConfirmActions: t.ConfirmActions));
             if (results.Count >= 100) break;
         }
         return results;
@@ -269,6 +279,15 @@ public sealed partial class AgentBridgeService
                 string.Equals(t.Ref, req.Within, StringComparison.OrdinalIgnoreCase)
                 || Normalize(t.Label) == normWithin);
             if (target is null) return [];
+
+            if (!string.IsNullOrWhiteSpace(req.Collection))
+            {
+                var page = target.QueryRecords?.Invoke(req) ?? new RecordPage([], 0);
+                return
+                [
+                    new AgentQueryMatch(target.Ref, target.Component, target.Label, [], 0, page.Records, page.Total, Math.Max(0, req.Offset)),
+                ];
+            }
 
             var allChoices = target.GetChoices();
             var filtered = string.IsNullOrEmpty(normText)
@@ -362,20 +381,31 @@ public sealed partial class AgentBridgeService
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" is not supported by \"{target.Label}\" ({target.Ref}).");
             }
 
-            if (AllowPolicy is not null && !await AllowPolicy(step, target.ConfirmRequired))
+            if (AllowPolicy is not null && !await AllowPolicy(step, target.NeedsConfirmation(step.Action)))
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was refused by policy.");
             }
-            if (allow is not null && !await allow(step, target.ConfirmRequired))
+            if (allow is not null && !await allow(step, target.NeedsConfirmation(step.Action)))
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was refused by caller policy.");
+            }
+
+            var stepArgs = new List<object?>();
+            foreach (var arg in step.Args ?? [])
+            {
+                var plain = AgentArgs.Unwrap(arg, out var argError);
+                if (argError is not null)
+                {
+                    return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was rejected: {argError}");
+                }
+                stepArgs.Add(plain);
             }
 
             var previousValue = target.Sensitive ? RedactedValue : target.GetValue();
             StepResult result;
             try
             {
-                result = await target.ExecuteAction(step.Action, step.Args ?? []);
+                result = await target.ExecuteAction(step.Action, stepArgs);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -402,7 +432,7 @@ public sealed partial class AgentBridgeService
                 currentValue,
                 step.Action,
                 AgentChangeSource.Agent,
-                target.RowOf?.Invoke(step.Action, step.Args ?? [])));
+                target.RowOf?.Invoke(step.Action, stepArgs)));
         }
 
         return new AgentActResult(true, outcomes, values);

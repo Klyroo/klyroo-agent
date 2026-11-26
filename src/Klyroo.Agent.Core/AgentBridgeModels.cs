@@ -36,7 +36,7 @@ public enum AgentChangeSource
 /// <param name="Value">The value after the step ran.</param>
 /// <param name="Reason">The action name that caused the change, for example <c>setValue</c>.</param>
 /// <param name="Source">What caused the change.</param>
-/// <param name="Row">The row a step addressed on a tabular component: the 0-based row index of a spreadsheet <c>editCell</c> step, otherwise <see langword="null"/>.</param>
+/// <param name="Row">The row a step addressed on a tabular component: the user-visible row number of a spreadsheet <c>editCell</c> step, the row numbers of <c>discardRows</c> and <c>restoreRows</c> joined by commas, otherwise <see langword="null"/>.</param>
 public sealed record ObservedChange(
     string Component,
     string Ref,
@@ -56,7 +56,8 @@ public sealed record ObservedChange(
 /// <param name="Actions">The action names the component accepts in <see cref="AgentActStep.Action"/>.</param>
 /// <param name="Disabled">Whether the component currently rejects actions.</param>
 /// <param name="OffPage">Whether the component is not rendered right now, for example a conditional form field whose condition is false.</param>
-/// <param name="ConfirmRequired">Whether the component was registered as needing confirmation. The bridge only reports the flag to <c>AllowPolicy</c>; it does not block anything by itself.</param>
+/// <param name="ConfirmRequired">Whether every action on the component needs confirmation, because it was registered that way. The bridge passes the flag to <c>AllowPolicy</c>.</param>
+/// <param name="ConfirmActions">The actions that need confirmation whatever the component flag says, for example <c>submit</c> and <c>clearFile</c> on a spreadsheet. Empty when the component has none.</param>
 public sealed record AgentComponentSnapshot(
     string Ref,
     string Component,
@@ -65,7 +66,8 @@ public sealed record AgentComponentSnapshot(
     IReadOnlyList<string> Actions,
     bool Disabled = false,
     bool OffPage = false,
-    bool ConfirmRequired = false);
+    bool ConfirmRequired = false,
+    IReadOnlyList<string>? ConfirmActions = null);
 
 /// <summary>One selectable option of a select, filter or view list, as returned by <c>AgentBridgeService.Query</c>.</summary>
 /// <param name="Value">The value to pass as the argument of <c>setValue</c> or <c>toggle</c>.</param>
@@ -84,12 +86,18 @@ public sealed record AgentChoiceItem(
 /// <param name="Label">The component label.</param>
 /// <param name="Items">At most 50 matching choices.</param>
 /// <param name="More">How many matching choices were left out because of the 50 item limit.</param>
+/// <param name="Records">One page of the collection named by <see cref="AgentQueryRequest.Collection"/>, each record a map of field names to values. <see langword="null"/> when no collection was requested.</param>
+/// <param name="Total">How many records the collection holds after filtering, so a caller knows whether to ask for the next page. 0 when <paramref name="Records"/> is <see langword="null"/>.</param>
+/// <param name="Offset">The index of the first record of <paramref name="Records"/> in the filtered collection.</param>
 public sealed record AgentQueryMatch(
     string Ref,
     string Component,
     string Label,
     IReadOnlyList<AgentChoiceItem> Items,
-    int More = 0);
+    int More = 0,
+    IReadOnlyList<IReadOnlyDictionary<string, object?>>? Records = null,
+    int Total = 0,
+    int Offset = 0);
 
 /// <summary>
 /// Filters for <c>AgentBridgeService.Query</c>. All text comparisons ignore case, accents and repeated whitespace.
@@ -112,7 +120,62 @@ public sealed class AgentQueryRequest
 
     /// <summary>Restricts the result to one component kind, for example <c>select</c>. Ignored when <see cref="Within"/> is set.</summary>
     public string? Kind { get; init; }
+
+    /// <summary>
+    /// With <see cref="Within"/>, pages through a collection of records the component holds instead of listing its
+    /// choices. A spreadsheet has <c>rows</c>, <c>issues</c>, <c>columns</c>, <c>headers</c> and <c>questions</c>.
+    /// An unknown collection returns an empty match.
+    /// </summary>
+    public string? Collection { get; init; }
+
+    /// <summary>The index of the first record to return from <see cref="Collection"/>. Negative values count as 0.</summary>
+    public int Offset { get; init; }
+
+    /// <summary>The number of records to return from <see cref="Collection"/>. 25 when 0 or negative, and never more than 100.</summary>
+    public int Limit { get; init; }
+
+    /// <summary>
+    /// Narrows <see cref="Collection"/> to one subset. For spreadsheet <c>rows</c>: <c>importable</c>, <c>invalid</c>,
+    /// <c>discarded</c> or <c>all</c>. For <c>issues</c>: <c>blocking</c>, <c>warnings</c> or <c>all</c>. For
+    /// <c>questions</c>: <c>open</c> or <c>all</c>. <see cref="Text"/> also filters records by their text.
+    /// </summary>
+    public string? Filter { get; init; }
 }
+
+/// <summary>
+/// What an agent needs to know about a spreadsheet import to decide the next action, without the rows. It is the
+/// <see cref="AgentComponentSnapshot.Value"/> of a spreadsheet component; page through rows and issues with
+/// <c>AgentBridgeService.Query</c>.
+/// </summary>
+/// <param name="Step">The wizard step in progress: <c>file</c>, <c>columns</c>, <c>values</c>, <c>review</c> or <c>submit</c>.</param>
+/// <param name="FileLoaded">Whether a file is loaded.</param>
+/// <param name="FileName">The name of the loaded file, or <see langword="null"/>.</param>
+/// <param name="Rows">The number of data rows in the file.</param>
+/// <param name="ImportableRows">The rows that would be imported.</param>
+/// <param name="InvalidRows">The rows that have an error and are not discarded.</param>
+/// <param name="DiscardedRows">The rows left out of the import, whatever the reason.</param>
+/// <param name="RowsWithWarnings">The importable rows that carry a warning.</param>
+/// <param name="OpenQuestions">The unknown values that still need an answer.</param>
+/// <param name="UnmappedRequiredColumns">The labels of the required columns no file column is assigned to.</param>
+/// <param name="CanSubmit">Whether a submit would be accepted now.</param>
+/// <param name="SubmitStatus">The submit state: <c>Idle</c>, <c>Running</c>, <c>Done</c> or <c>Error</c>.</param>
+/// <param name="ImportedCount">The number of rows the last submit sent.</param>
+/// <param name="SubmitError">The message of the failed submit, or <see langword="null"/>.</param>
+public sealed record AgentSpreadsheetSummary(
+    string Step,
+    bool FileLoaded,
+    string? FileName,
+    int Rows,
+    int ImportableRows,
+    int InvalidRows,
+    int DiscardedRows,
+    int RowsWithWarnings,
+    int OpenQuestions,
+    IReadOnlyList<string> UnmappedRequiredColumns,
+    bool CanSubmit,
+    string SubmitStatus,
+    int ImportedCount,
+    string? SubmitError);
 
 /// <summary>One action to run in an <c>AgentBridgeService.ActAsync</c> call.</summary>
 /// <param name="Ref">A component reference such as <c>c2</c>, or a component label.</param>
