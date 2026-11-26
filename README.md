@@ -39,7 +39,7 @@ To use the library in an app:
 - **An AI host that calls your code**: the bridge exposes `snapshot`, `query` and `act` as methods and tool definitions; your MCP server, chat endpoint or tool loop calls them. The library does not call a model itself.
 - **For the browser runtime** (`klyroo-agent.js`): a browser with ES modules, the static web assets of the app served (`MapStaticAssets` or `UseStaticFiles`), and, for `registerWebMcp`, a browser that exposes the WebMCP `modelContext` API, which is still experimental.
 
-To build this repository you need the .NET 10 SDK (a newer SDK works too, see `global.json`) and clones of `klyroo-dashboard`, `klyroo-form`, `klyroo-spreadsheet` in the same parent folder: some projects reference them by relative path (`../klyroo-dashboard/...`). See [Contributing](CONTRIBUTING.md).
+To build this repository you need the .NET 10 SDK (a newer SDK works too, see `global.json`) and clones of `klyroo-dashboard`, `klyroo-form` and `klyroo-spreadsheet` in the same parent folder: some projects reference them by relative path (`../klyroo-dashboard/...`). See [Contributing](CONTRIBUTING.md).
 
 ## Installation
 
