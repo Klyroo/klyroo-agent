@@ -3,6 +3,7 @@
 
 const observers = new Set();
 const elementRefs = new WeakMap();
+// ref -> WeakRef(element). Weak, and pruned of detached elements, so refs of removed DOM do not keep it alive.
 const refToElement = new Map();
 let refCounter = 0;
 
@@ -65,9 +66,22 @@ function assignRef(el) {
   if (!ref) {
     ref = `c${++refCounter}`;
     elementRefs.set(el, ref);
-    refToElement.set(ref, el);
+    refToElement.set(ref, new WeakRef(el));
   }
   return ref;
+}
+
+/** Forgets the refs of elements that were removed from the document or garbage collected. */
+function pruneRefs() {
+  for (const [ref, weak] of refToElement) {
+    const el = weak.deref();
+    if (el === undefined || !el.isConnected) refToElement.delete(ref);
+  }
+}
+
+/** The number of refs currently tracked, for tests and diagnostics. */
+export function trackedRefCount() {
+  return refToElement.size;
 }
 
 /** Emits an ObservedChange event to all registered `Klyroo.observe` subscribers. */
@@ -142,10 +156,28 @@ function isDisabledElement(el) {
   }
 }
 
-/** True when the element is not displayed: detached, hidden, inside a closed dialog, or not rendered by CSS. */
+/** True when the element rejects edits: readonly or aria-readonly, itself or through an aria-readonly ancestor. */
+function isReadOnlyElement(el) {
+  if (el.readOnly === true || el.hasAttribute('readonly') || el.getAttribute('aria-readonly') === 'true') return true;
+  return el.closest('[aria-readonly="true"]') !== null;
+}
+
+/**
+ * True when the element is not displayed: detached, hidden, in a closed dialog, inert, under aria-hidden, or not
+ * rendered by CSS (display none, visibility hidden or collapse, content-visibility hidden).
+ */
 function isOffPageElement(el) {
-  if (!el.isConnected || el.closest('[hidden], dialog:not([open])') !== null) return true;
-  return typeof el.checkVisibility === 'function' && !el.checkVisibility();
+  if (!el.isConnected) return true;
+  if (el.closest('[hidden], dialog:not([open]), [inert], [aria-hidden="true"]') !== null) return true;
+  if (typeof el.checkVisibility === 'function') {
+    // visibilityProperty is the standard option name; checkVisibilityCSS is the older spelling some browsers still honor.
+    if (!el.checkVisibility({ visibilityProperty: true, checkVisibilityCSS: true })) return true;
+  }
+  if (typeof globalThis.getComputedStyle === 'function') {
+    const visibility = globalThis.getComputedStyle(el)?.visibility;
+    if (visibility === 'hidden' || visibility === 'collapse') return true;
+  }
+  return false;
 }
 
 /** True when the element, or an ancestor, asks for confirmation before an agent acts on it. */
@@ -160,7 +192,8 @@ function describeElement(el) {
   const disabled = isDisabledElement(el);
   const offPage = isOffPageElement(el);
   const confirmRequired = needsConfirmation(el);
-  return { ...describeKind(el, { ref, sensitive, label, disabled, offPage }), confirmRequired };
+  const readOnly = isReadOnlyElement(el);
+  return { ...describeKind(el, { ref, sensitive, label, disabled, offPage }), confirmRequired, readOnly };
 }
 
 function describeKind(el, { ref, sensitive, label, disabled, offPage }) {
@@ -190,7 +223,7 @@ function describeKind(el, { ref, sensitive, label, disabled, offPage }) {
       value: val,
       disabled,
       offPage,
-      actions: ['setValue', 'clear', 'open', 'close'],
+      actions: ['setValue', 'clear'],
     };
   }
 
@@ -255,11 +288,28 @@ function extractChoices(el) {
   }));
 }
 
-/** Creates the Klyroo Agent runtime (`snapshot`, `query`, `act`, `registerWebMcp`). */
-export function createAgent({ allow = null } = {}) {
+/** Actions that change a value, refused on read-only elements. */
+const EDIT_ACTIONS = new Set(['setValue', 'clear', 'toggle', 'setChecked']);
+
+/** The most steps one `act` call accepts; the same cap as MaxStepsPerAct in the .NET bridge. */
+export const MAX_STEPS_PER_ACT = 50;
+
+/**
+ * Creates the Klyroo Agent runtime (`snapshot`, `query`, `act`, `registerWebMcp`).
+ * `root` (an element, or a function returning one) limits everything the agent sees and operates to that subtree:
+ * snapshot, query and act use the same scope, so the agent cannot act on what it was not shown.
+ */
+export function createAgent({ allow = null, root = null } = {}) {
+  function scopeRoot(within = null) {
+    const base = (typeof root === 'function' ? root() : root) ?? null;
+    const registered = base instanceof Element ? base : null;
+    if (within instanceof Element && (!registered || registered.contains(within))) return within;
+    return registered ?? document;
+  }
+
   function snapshot({ within = null } = {}) {
-    const root = within instanceof Element ? within : document;
-    const elements = discoverComponents(root);
+    pruneRefs();
+    const elements = discoverComponents(scopeRoot(within));
     const items = elements.slice(0, 100).map(describeElement);
     if (elements.length > 100) {
       items.push({ more: elements.length - 100 });
@@ -268,7 +318,8 @@ export function createAgent({ allow = null } = {}) {
   }
 
   async function query({ within = null, text = '', kind = '' } = {}) {
-    const elements = discoverComponents(document);
+    pruneRefs();
+    const elements = discoverComponents(scopeRoot());
     const normWithin = normalizeLabel(within);
     const normText = normalizeLabel(text);
     const normKind = normalizeLabel(kind);
@@ -319,6 +370,10 @@ export function createAgent({ allow = null } = {}) {
     const fail = (error) => ({ ok: false, steps: appliedSteps, values, error });
 
     if (!Array.isArray(steps)) return fail('"steps" must be a list of steps.');
+    if (steps.length > MAX_STEPS_PER_ACT) {
+      return fail(`Too many steps: ${steps.length} given, at most ${MAX_STEPS_PER_ACT} per call. Nothing ran; send fewer steps.`);
+    }
+    pruneRefs();
 
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
@@ -329,18 +384,19 @@ export function createAgent({ allow = null } = {}) {
         if (step.args !== undefined && step.args !== null && !Array.isArray(step.args)) {
           return fail(`Step ${i + 1}: "args" must be a list.`);
         }
-        const elements = discoverComponents(document);
-        const normRef = normalizeLabel(step.ref);
-        const matches = elements.filter((el) => {
-          const r = assignRef(el);
-          if (r === step.ref) return true;
-          return normalizeLabel(labelOf(el) || el.textContent) === normRef;
-        });
+        const elements = discoverComponents(scopeRoot());
+        for (const candidate of elements) assignRef(candidate);
+        // An exact ref wins over any label: a label that happens to read "c3" must not capture the step meant for ref c3.
+        let matches = elements.filter((candidate) => elementRefs.get(candidate) === step.ref);
+        if (matches.length === 0) {
+          const normRef = normalizeLabel(step.ref);
+          matches = elements.filter((candidate) => normalizeLabel(labelOf(candidate) || candidate.textContent) === normRef);
+        }
 
         if (matches.length === 0) {
           return fail(`Step ${i + 1}: component "${step.ref}" not found.`);
         }
-        if (matches.length > 1 && !refToElement.has(step.ref)) {
+        if (matches.length > 1) {
           return fail(`Step ${i + 1}: ambiguous label "${step.ref}" matched ${matches.length} components (${matches.map(assignRef).join(', ')}). Use a specific ref.`);
         }
 
@@ -354,6 +410,14 @@ export function createAgent({ allow = null } = {}) {
         if (isOffPageElement(el)) {
           return fail(`Step ${i + 1}: component "${name}" (${ref}) is not displayed right now.`);
         }
+        if (EDIT_ACTIONS.has(step.action) && isReadOnlyElement(el)) {
+          return fail(`Step ${i + 1}: component "${name}" (${ref}) is read-only.`);
+        }
+        // Only the actions the snapshot lists for this element can run.
+        const advertised = describeElement(el).actions ?? [];
+        if (!advertised.includes(step.action)) {
+          return fail(`Step ${i + 1}: action "${step.action}" is not supported by "${name}" (${ref}). Supported: ${advertised.join(', ') || 'none'}.`);
+        }
 
         const needsConfirm = needsConfirmation(el);
         // A confirmation-required component is refused unless a policy decides about it.
@@ -362,17 +426,19 @@ export function createAgent({ allow = null } = {}) {
         }
         const stepWithMeta = { ...step, ref, confirm: needsConfirm };
 
-        if (allow && (await allow(stepWithMeta)) === false) {
-          return fail(`Step ${i + 1}: action "${step.action}" refused by agent policy.`);
-        }
-        if (callAllow && (await callAllow(stepWithMeta)) === false) {
+        // For a confirmation step only an explicit true approves: undefined, null or any other truthy value is a refusal.
+        const approves = (decision) => (needsConfirm ? decision === true : decision !== false);
+        if (callAllow && !approves(await callAllow(stepWithMeta))) {
           return fail(`Step ${i + 1}: action "${step.action}" refused by caller policy.`);
+        }
+        if (allow && !approves(await allow(stepWithMeta))) {
+          return fail(`Step ${i + 1}: action "${step.action}" refused by agent policy.`);
         }
 
         const prevValue = el.value ?? el.getAttribute('value') ?? null;
         const args = step.args ?? [];
 
-        if (el.__klyPrimitive && typeof el.__klyPrimitive.api[step.action] === 'function') {
+        if (el.__klyPrimitive && Object.hasOwn(el.__klyPrimitive.api, step.action) && typeof el.__klyPrimitive.api[step.action] === 'function') {
           await el.__klyPrimitive.api[step.action](...args);
         } else if (step.action === 'setValue') {
           const nextVal = args[0] ?? '';
@@ -471,13 +537,18 @@ export const agentTools = [
       properties: {
         steps: {
           type: 'array',
+          maxItems: MAX_STEPS_PER_ACT,
           items: {
             type: 'object',
             required: ['ref', 'action'],
             properties: {
-              ref: { type: 'string', description: 'Component ref (e.g. c1) or accessible label.' },
-              action: { type: 'string', description: 'Action name from snapshot (e.g. setValue, clear, toggle, press).' },
-              args: { type: 'array', items: {}, description: 'Arguments for the action.' },
+              ref: { type: 'string', minLength: 1, description: 'Component ref (e.g. c1) or accessible label.' },
+              action: { type: 'string', minLength: 1, description: 'Action name from snapshot (e.g. setValue, clear, toggle, press).' },
+              args: {
+                type: 'array',
+                items: { type: ['string', 'number', 'boolean', 'null', 'array'], items: { type: ['string', 'number', 'boolean', 'null'] } },
+                description: 'Arguments for the action: text, numbers, booleans, null or lists of those.',
+              },
             },
           },
         },
