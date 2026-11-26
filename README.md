@@ -15,11 +15,14 @@ in a console app.
 
 - **Snapshot**: lists every registered component with a stable reference (`c1`, `c2`, ...), its label, current value and the actions it accepts, capped at 100 entries.
 - **Query**: lists the choices of a select or filter, filtered by text, without opening a popup. Matching ignores case and accents.
-- **Act**: runs named actions (`setValue`, `toggle`, `clear`, `reset`, `submit`, `nextStep`, `setView`, `refresh`, `editCell`) by reference or label, stops at the first failing step and reports why.
-- **Permission gate**: `AllowPolicy` and a per-call `allow` callback can refuse any step, and forms can be flagged as confirmation-required.
+- **Act**: runs named actions (`setValue`, `toggle`, `clear`, `reset`, `submit`, `nextStep`, `setView`, `refresh`, and the spreadsheet actions `assignColumn`, `answerValue`, `editCell`, `discardRows` and more) by reference or label, stops at the first failing step and reports why.
+- **Typed values**: `setValue` on a form field coerces what a model sends (JSON numbers, text, lists) to the type of the field kind and refuses a select value that is not an option, with the reason.
+- **Permission gate**: `AllowPolicy` and a per-call `allow` callback can refuse any step. Steps that need confirmation (forms registered with `confirmSubmit`, a spreadsheet `submit` or `clearFile`) are refused when no policy is set.
+- **Spreadsheet imports**: the snapshot value is a summary (step, counts, open questions, unmapped required columns) and `Query` pages through rows and issues, addressed by the row number the user sees.
 - **Secret redaction**: password and one-time-code fields appear as `[redacted]` in snapshots, results and observed changes.
 - **Observe**: `Observe` delivers one `ObservedChange` per successful step, with the previous and new value.
-- **Tool definitions**: `GetToolDefinitions` returns the `snapshot`, `query` and `act` tool descriptions, with read-only and consequential hints, ready to hand to an LLM or MCP host.
+- **Tool definitions**: `GetToolDefinitions` returns the `snapshot`, `query` and `act` tool descriptions, with read-only and consequential hints and the JSON schema of the arguments, and `InvokeToolAsync` runs a call from its raw JSON arguments.
+- **Microsoft.Extensions.AI**: `Klyroo.Agent.AI` turns the bridge into `AIFunction` instances for any `IChatClient`, with an approval step for confirmation-required actions.
 - **Browser runtime**: a separate JavaScript module (`klyroo-agent.js`) offers the same three operations over the DOM and can register them with WebMCP when the browser provides it.
 
 ## Packages
@@ -28,6 +31,7 @@ in a console app.
 | :--- | :--- |
 | [`Klyroo.Agent.Core`](https://www.nuget.org/packages/Klyroo.Agent.Core) | The data types of the bridge (`AgentActStep`, `AgentActResult`, `ObservedChange`, ...) and `UndoStack<T>`. No dependencies, NativeAOT compatible. |
 | [`Klyroo.Agent`](https://www.nuget.org/packages/Klyroo.Agent) | `AgentBridgeService`, `AddKlyrooAgent()`, and the browser runtime served from `_content/Klyroo.Agent/`. Depends on `Klyroo.Agent.Core`, `Klyroo.Form.Core`, `Klyroo.Dashboard.Core` and `Klyroo.Spreadsheet.Core`. |
+| [`Klyroo.Agent.AI`](https://www.nuget.org/packages/Klyroo.Agent.AI) | `AsAIFunctions()`: the bridge as `Microsoft.Extensions.AI` functions, with approval for confirmation-required actions. Depends on `Klyroo.Agent` and `Microsoft.Extensions.AI.Abstractions`. |
 | [`@klyroo/agent`](https://github.com/klyroo/klyroo-agent/blob/main/packages/agent/README.md) | Source of the browser runtime (npm package manifest). Not published to npm; the same file ships inside `Klyroo.Agent`. |
 
 ## Prerequisites

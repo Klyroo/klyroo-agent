@@ -5,7 +5,7 @@ NativeAOT compatible and trimmable.
 
 It contains the records and enum that describe what an AI agent sees and does: `AgentComponentSnapshot`,
 `AgentQueryRequest`, `AgentQueryMatch`, `AgentChoiceItem`, `AgentActStep`, `AgentActResult`, `AgentActStepOutcome`,
-`ObservedChange`, `AgentChangeSource` and `AgentToolDefinition`. The bridge that produces them,
+`ObservedChange`, `AgentChangeSource`, `AgentSpreadsheetSummary`, `AgentToolDefinition` (with its JSON input schema) and `AgentToolError`. The bridge that produces them,
 `AgentBridgeService`, lives in the `Klyroo.Agent` package.
 
 ## Install

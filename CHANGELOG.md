@@ -10,8 +10,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - `RegisterForm`, `RegisterDashboard` and `RegisterSpreadsheet` return a handle that removes the registered components when disposed.
-- `ObservedChange.Row` holds the row index of a spreadsheet `editCell` step.
+- `ObservedChange.Row` holds the row number of a spreadsheet `editCell` step.
 - A dashboard filter `setValue` accepts a list of values for a multiple filter.
+- `Klyroo.Agent.AI`, a new package: `AgentBridgeService.AsAIFunctions()` returns `snapshot`, `query` and `act` as `Microsoft.Extensions.AI` `AIFunction` instances with their schemas. Steps that need confirmation are refused by `act` and run through `act_with_approval`, which is wrapped in `ApprovalRequiredAIFunction`, so a `FunctionInvokingChatClient` asks for approval first. `AgentConfirmationMode.UseBridgePolicy` leaves the decision to `AllowPolicy` instead. The guides show an in-page chat in the same Blazor circuit.
+- `AgentToolDefinition.InputSchema`, the JSON Schema of the tool arguments, and `AgentBridgeService.InvokeToolAsync`, which runs a tool call from its raw JSON arguments and returns an `AgentToolError` for a malformed call.
+- Spreadsheet imports: the snapshot value is an `AgentSpreadsheetSummary`, `Query` pages through `rows`, `issues`, `columns`, `headers` and `questions` (`Collection`, `Offset`, `Limit`, `Filter` on `AgentQueryRequest`; `Records`, `Total`, `Offset` on `AgentQueryMatch`), and the new actions `assignColumn`, `ignoreColumn`, `resetColumn`, `answerValue`, `discardRows` and `restoreRows` address rows by the row number the user sees.
+- `AgentComponentSnapshot.ConfirmActions` lists the actions that need confirmation whatever the component flag says. A spreadsheet `submit` and `clearFile` are in it.
+- A refused step explains why (`was rejected: ...`): a select value that is not an option, a number out of range, an unknown row number, a read-only column, the blockers of a `submit`.
+- `klyroo-agent.js` snapshot items report `confirmRequired`, and `packages/agent` has a `node --test` suite that runs the runtime against a fake DOM.
+
+### Changed
+
+- **Breaking (preview):** steps that need confirmation are refused when neither `AllowPolicy` nor the `allow` argument of `ActAsync` is set. Before, `ConfirmRequired` was only a flag and such steps ran. To allow them, set a policy such as `agent.AllowPolicy = (step, confirm) => Task.FromResult(!confirm || userApproved)`, or `(_, _) => Task.FromResult(true)` to approve everything. The same default applies to `data-agent-confirm` elements in `klyroo-agent.js`: pass `allow` to `createAgent`.
+- **Breaking (preview):** a spreadsheet `editCell` takes the row number the user sees in the file (the header is usually row 1, so the first data row is 2) instead of an internal 0-based index, and `ObservedChange.Row` reports that number. The spreadsheet snapshot value is an `AgentSpreadsheetSummary` instead of the step key; read `Step` for the old value.
+- **Breaking (preview):** the `AgentToolDefinition` record has a sixth parameter, `InputSchema`.
+- `ActAsync` unwraps `JsonElement` step arguments once, so every component, the dashboard filters included, receives plain values when a host passes raw JSON.
 
 ### Removed
 
@@ -19,6 +32,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A form `setValue` stored the raw argument. A model's `JsonElement` or text now becomes the value the field kind stores (a number, a boolean, a date text, a list of option values) with the invariant culture, and a select, radio or autocomplete value that is not an enabled option is refused with the reason. See the table in [Concepts](docs/concepts.md#values-the-model-sends).
+- `klyroo-agent.js` `act` ran actions on disabled and hidden elements and let an exception from an action or a policy reject the whole call. It now refuses them and returns `{ ok: false, error }`.
 - A step whose action throws, such as a failing `OnSubmit` or a non-numeric `editCell` row, now fails the run with an `Error` instead of throwing out of `ActAsync`.
 - A dashboard filter `setValue` toggled the value, so setting a selected value removed it, and `clear` restored the defaults. `setValue` now sets the selection, `clear` empties it (multiple filters only), and an unknown value or a selection over `Max` fails the step instead of reporting success.
 - Steps on a component that is not displayed, such as a hidden conditional field, are refused.

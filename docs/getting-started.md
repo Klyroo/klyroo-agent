@@ -150,7 +150,9 @@ not care how the controller is displayed.
 
 Something still has to call `Snapshot`, `Query` and `ActAsync`: your own endpoint, a SignalR hub, an in-app
 assistant, or an MCP server. [Expose the three operations as tools](guides.md#expose-the-operations-as-llm-tools)
-shows a handler you can start from.
+shows a handler you can start from, and [the chat guide](guides.md#add-an-in-page-chat-in-the-same-blazor-circuit)
+wires an `IChatClient` to the bridge. Because this form is registered with `confirmSubmit: true`, a `submit` step is
+refused until you set an `AllowPolicy`, as the [approval guide](guides.md#require-approval-before-consequential-actions) shows.
 
 ## Next steps
 

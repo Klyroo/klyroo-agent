@@ -26,7 +26,7 @@ gets and which actions it offers:
 | The form | `form` | `submit`, `reset`; stepped forms also `nextStep`, `previousStep` |
 | Dashboard filter | `select` | `setValue`, `reset`; multiple filters also `toggle`, `clear` |
 | The dashboard | `dashboard` | `setView`, `resetFilters`, `refresh` |
-| Spreadsheet importer | `spreadsheet` | `editCell`, `nextStep`, `previousStep`, `submit`, `clearFile` |
+| Spreadsheet importer | `spreadsheet` | `assignColumn`, `ignoreColumn`, `resetColumn`, `answerValue`, `editCell`, `discardRows`, `restoreRows`, `nextStep`, `previousStep`, `submit`, `clearFile` (the last two need confirmation) |
 
 Stateless form fields (the kinds `Info`, `Divider`, `Section` and `Button`) are skipped. References are assigned in
 registration order as `c1`, `c2`, and so on, and never change for the life of the service.
@@ -41,9 +41,11 @@ first check that fails:
    error, which lists the references so the caller can retry with one.
 2. **Check state.** A component whose disabled check returns true rejects the step.
 3. **Check the action.** The action name must be in the component's action list.
-4. **Ask the policy.** `AllowPolicy` runs, then the `allow` callback passed to the call. Either returning `false`
+4. **Ask the policy.** A step that needs confirmation is refused when neither `AllowPolicy` nor an `allow` callback is
+   set. Otherwise `AllowPolicy` runs, then the `allow` callback passed to the call, and either returning `false`
    refuses the step.
-5. **Run it.** The action calls the controller. An action that returns `false` fails the step.
+5. **Run it.** The action calls the controller. An action that returns `false`, or refuses its argument with a reason
+   (a select value that is not an option, a row number the file does not have), fails the step and the message says why.
 6. **Report it.** The new value is stored in `AgentActResult.Values`, the step is added to `Steps`, and one
    `ObservedChange` is delivered to subscribers.
 
@@ -55,11 +57,51 @@ correct itself. There is no rollback. If step 3 of 5 fails, steps 1 and 2 stay a
 
 ## Confirmation and policy
 
-The bridge does not decide what is risky. You mark it: `RegisterForm(form, confirmSubmit: true)` sets
-`ConfirmRequired` on the form component, and every action on that component carries the flag to the policy.
-`AllowPolicy` is the single place where you turn the flag into a decision, typically by asking the user. With no
-policy, flagged and unflagged targets behave the same. This keeps the library out of your UI: it never opens a
-dialog, it only asks a function.
+The bridge does not decide what is risky in your app. You mark it: `RegisterForm(form, confirmSubmit: true)` sets
+`ConfirmRequired` on the form component, and every action on that component carries the flag to the policy. Some
+actions are marked by the bridge itself: a spreadsheet `submit` and `clearFile` always need confirmation, listed in
+`ConfirmActions` of the snapshot entry. `AllowPolicy` is the single place where you turn the flag into a decision,
+typically by asking the user.
+
+With no `AllowPolicy` and no `allow` callback, a step that needs confirmation is refused with `needs confirmation and
+no AllowPolicy is set`, and every other step runs. This is the safe default: an agent cannot submit or clear anything
+until you decide how it is approved. The library never opens a dialog, it only asks a function.
+
+## Values the model sends
+
+A model delivers arguments as JSON, so numbers, booleans and lists arrive as `JsonElement` and often as text. `ActAsync`
+unwraps them once, and a form `setValue` then coerces the value to what the field kind stores, with the invariant
+culture:
+
+| Field kind | Stored value | Accepted from the model |
+| :--- | :--- | :--- |
+| Text, Textarea, Password, OneTimeCode, PhoneNumber, Hidden | `string` | text or a number; `MaxLength` is enforced |
+| Number, Slider | `double` | a JSON number or numeric text such as `12.5` (no thousands separator); `Min` and `Max` are enforced |
+| Rating | `double` | a whole number from `Min` (default 0) to `Max` (default 5) |
+| Checkbox, Switch | `bool` | `true`, `false`, `"yes"`, `"no"`, `"on"`, `"off"`, `"1"`, `"0"`, or the number 0 or 1 |
+| Date | `yyyy-MM-dd` text | that format, or a full local timestamp read for its date |
+| DateTime, Time | `yyyy-MM-ddTHH:mm` and `HH:mm` text | those formats, without a time zone |
+| DateRange | list of two dates | `["2026-01-01", "2026-01-31"]`, end not before start |
+| ColorPicker | `#rrggbb` text | that format, stored in lower case |
+| Select, AutoComplete, Radio | the option value | an option value, or an option label ignoring case and accents; disabled and ambiguous labels are refused |
+| CheckboxGroup, multiple Select and AutoComplete | list of option values | a list of values or labels, or one value; duplicates are dropped |
+| Tag | list of text | a list of text, trimmed and de-duplicated |
+| ArrayList, ArrayTable, containers | none | refused: `setValue` cannot edit a repeatable list |
+
+A value that does not fit fails the step with the reason and leaves the form untouched, so the model can correct
+itself. An empty value (`null` or `""`) clears a text, number, date or single choice field, and empties a multiple choice.
+
+## Spreadsheet imports
+
+The snapshot value of a spreadsheet is an `AgentSpreadsheetSummary`: the wizard step, the counts of rows, importable,
+invalid, discarded and warning rows, the number of open questions, the required columns no file column matches, and the
+submit state. It carries no rows, so a large file does not flood the model. To read rows, use `Query` with `Within`
+set to the importer and `Collection` set to `rows`, `issues`, `columns`, `headers` or `questions`, with `Offset`, `Limit`
+(25 by default, 100 at most), `Filter` and `Text`.
+
+Rows are addressed by the row number the user sees in the file, the `rowNumber` of a row record, for `editCell`,
+`discardRows` and `restoreRows`. The header is usually row 1, so the first data row is row 2. Internal indexes never
+appear.
 
 ## Secrets
 
@@ -99,7 +141,7 @@ The runtime discovers elements that match `[data-kly-primitive]`, the `kly-*` cu
 associated `label`, a form-field container, or the placeholder, title or name. Its actions are `setValue`, `clear`,
 `toggle`, `setChecked`, `press` and `focus`, plus whatever API a registered primitive exposes. `snapshot` returns at
 most 100 elements and `query` at most 50 matches. Elements marked `data-agent-confirm` set `step.confirm` for the
-`allow` callback. Like the .NET bridge, it accepts a policy at two levels: `allow` on `createAgent` and `allow` on each `act` call.
+`allow` callback. Like the .NET bridge, it accepts a policy at two levels: `allow` on `createAgent` and `allow` on each `act` call, and it refuses a `data-agent-confirm` element when neither is set. `act` refuses disabled elements (including those inside a disabled `fieldset`) and elements that are not displayed, and turns an exception thrown by an action or a policy into `{ ok: false, error }`.
 
 `registerWebMcp` publishes `snapshot`, `query` and `act` to the browser's `modelContext` (WebMCP) when
 `document.modelContext` or `navigator.modelContext` exposes `registerTool`, and returns a function that

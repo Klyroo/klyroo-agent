@@ -29,17 +29,25 @@ Each component only accepts the actions listed in its snapshot entry. A checkbox
 **A step fails with `returned false`**
 
 The controller ran the action and declined. Typical causes are a `submit` or `nextStep` on a form that fails
-validation, `setView` with no argument, or `editCell` with fewer than three arguments. Earlier steps stay applied.
+validation, or `setView` with no argument. Most refusals carry a reason after `was rejected:`, such as a select value that
+is not an option or a row number the file does not have. Earlier steps stay applied.
+
+**A step fails with `needs confirmation and no AllowPolicy is set`**
+
+The step targets a component registered with `confirmSubmit: true`, or is a spreadsheet `submit` or `clearFile`, and
+nothing decides about it. This is the default on purpose. Set `AllowPolicy` (or pass `allow` to `ActAsync`) to approve
+such steps; see [Require approval before consequential actions](guides.md#require-approval-before-consequential-actions).
 
 **A step fails with `refused by policy` but I never set a policy**
 
 `refused by policy` comes from `AllowPolicy`, `refused by caller policy` from the `allow` argument. Check where the
 service is configured; `AddKlyrooAgent()` itself sets no policy.
 
-**Submitting a flagged form goes through**
+**Submitting a flagged form is refused**
 
-`confirmSubmit: true` only marks the form. Nothing is refused unless `AllowPolicy` or `allow` returns `false` for it.
-See [Require approval before consequential actions](guides.md#require-approval-before-consequential-actions).
+`confirmSubmit: true` makes every action on the form need confirmation, and without an `AllowPolicy` or an `allow`
+callback those steps are refused. Earlier previews let them through, which is a breaking change; set a policy that
+approves them to get the old behavior. See [Require approval before consequential actions](guides.md#require-approval-before-consequential-actions).
 
 **`Snapshot` is missing components**
 
