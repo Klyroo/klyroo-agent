@@ -80,7 +80,7 @@ public static class AgentBridgeAIExtensions
             var json = ToJson(arguments);
             var tool = definition.Name == ActWithApprovalName ? "act" : definition.Name;
 
-            object result;
+            AgentToolResult result;
             switch (mode)
             {
                 case ActMode.RefuseConfirmationSteps:
@@ -110,8 +110,17 @@ public static class AgentBridgeAIExtensions
                     result = await bridge.InvokeToolAsync(tool, json);
                     break;
             }
-            return JsonSerializer.SerializeToElement(result, result.GetType(), ResultOptions);
+            return ToJson(result);
         }
+
+        // The snapshot and query tools answer with a bare JSON array, so their wrappers write the list they hold; the other
+        // results are records whose properties are the JSON.
+        private static JsonElement ToJson(AgentToolResult result) => result switch
+        {
+            AgentSnapshotResult snapshot => JsonSerializer.SerializeToElement(snapshot.Components, ResultOptions),
+            AgentQueryResult query => JsonSerializer.SerializeToElement(query.Matches, ResultOptions),
+            _ => JsonSerializer.SerializeToElement(result, result.GetType(), ResultOptions),
+        };
 
         // The model's arguments arrive as JsonElement values (or plain values from a .NET caller); the bridge reads one JSON object.
         private static JsonElement ToJson(AIFunctionArguments arguments)

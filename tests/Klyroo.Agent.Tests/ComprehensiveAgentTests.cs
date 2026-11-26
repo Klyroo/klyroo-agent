@@ -15,16 +15,16 @@ public sealed class ComprehensiveAgentTests
         var observed = new List<ObservedChange>();
         using var sub = agent.Observe(observed.Add);
 
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "cfg",
             Title = "Project Settings",
             Fields =
             [
-                new FormFieldSchema { Key = "name", Label = "Project Name", DefaultValue = "Alpha" },
-                new FormFieldSchema { Key = "secret", Label = "API Secret", Kind = FormFieldKind.Password, DefaultValue = "super-secret" },
-                new FormFieldSchema { Key = "region", Label = "Région", Kind = FormFieldKind.Select, DefaultValue = "eu-west", Options = [new("eu-west", "Europe West"), new("us-east", "US East")] },
-                new FormFieldSchema { Key = "locked", Label = "Locked Field", DisabledWhen = _ => true }
+                new DynamicFieldSchema { Key = "name", Label = "Project Name", DefaultValue = "Alpha" },
+                new DynamicFieldSchema { Key = "secret", Label = "API Secret", Kind = FormFieldKind.Password, DefaultValue = "super-secret" },
+                new DynamicFieldSchema { Key = "region", Label = "Région", Kind = FormFieldKind.Select, DefaultValue = "eu-west", Options = [new("eu-west", "Europe West"), new("us-east", "US East")] },
+                new DynamicFieldSchema { Key = "locked", Label = "Locked Field", DisabledWhen = _ => true }
             ]
         });
 
@@ -37,7 +37,7 @@ public sealed class ComprehensiveAgentTests
 
         // 1. Secret redaction
         var snap = agent.Snapshot();
-        Assert.Equal(AgentBridgeService.RedactedValue, snap.First(s => s.Label == "API Secret").Value);
+        Assert.Equal(AgentValue.From(AgentBridgeService.RedactedValue), snap.First(s => s.Label == "API Secret").Value);
 
         // 2. Accent-insensitive Query without opening popups
         var q = agent.Query(new AgentQueryRequest { Within = "region", Text = "Europe" });

@@ -1,5 +1,9 @@
+using System.Buffers;
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Klyroo.Agent;
 
@@ -24,17 +28,17 @@ public sealed partial class AgentBridgeService
     }
 
     /// <summary>One page of a collection and the size of the whole filtered collection.</summary>
-    private sealed record RecordPage(IReadOnlyList<IReadOnlyDictionary<string, object?>> Records, int Total);
+    private sealed record RecordPage(IReadOnlyList<AgentRecord> Records, int Total);
 
     private sealed class BoundTarget
     {
         public required string Ref { get; init; }
         public required string Component { get; init; }
         public required string Label { get; init; }
-        public required Func<object?> GetValue { get; init; }
+        public required Func<AgentValue?> GetValue { get; init; }
         public required IReadOnlyList<string> Actions { get; init; }
         public required Func<IReadOnlyList<AgentChoiceItem>> GetChoices { get; init; }
-        public required Func<string, IReadOnlyList<object?>, Task<StepResult>> ExecuteAction { get; init; }
+        public required Func<string, IReadOnlyList<JsonElement>, Task<StepResult>> ExecuteAction { get; init; }
         public Func<bool>? IsDisabled { get; init; }
         /// <summary>In effect but not shown now, such as a field of another step. Listed only when the caller asks for off-page components.</summary>
         public Func<bool>? IsOffPage { get; init; }
@@ -49,7 +53,7 @@ public sealed partial class AgentBridgeService
 
         public bool NeedsConfirmation(string action) => ConfirmRequired || ConfirmActions.Contains(action, StringComparer.Ordinal);
         /// <summary>The row an action step addresses, for tabular components; reported as <see cref="ObservedChange.Row"/>.</summary>
-        public Func<string, IReadOnlyList<object?>, string?>? RowOf { get; init; }
+        public Func<string, IReadOnlyList<JsonElement>, string?>? RowOf { get; init; }
     }
 
     /// <summary>Removes the components added by one Register call.</summary>
@@ -73,6 +77,13 @@ public sealed partial class AgentBridgeService
     public AgentBridgeService()
     {
     }
+
+    /// <summary>
+    /// Where the bridge logs an action that threw. The text of such an exception can hold a path or a connection string, so
+    /// <see cref="ActAsync"/> does not give it to the model: the model reads a generic message, and the exception goes here.
+    /// <see langword="null"/> logs nothing.
+    /// </summary>
+    public ILogger? Logger { get; set; }
 
     /// <summary>The most steps one <see cref="ActAsync"/> call accepts. A longer list is refused before any step runs, so a runaway model cannot queue unbounded work.</summary>
     public const int MaxStepsPerAct = 50;
@@ -132,7 +143,7 @@ public sealed partial class AgentBridgeService
                 Component = "select",
                 Label = filter.Label,
                 IsDisabled = () => !filter.Enabled,
-                GetValue = () => filter.Multiple ? filter.Values : filter.Value,
+                GetValue = () => filter.Multiple ? AgentValue.From(filter.Values) : filter.Value is { } selected ? AgentValue.From(selected) : null,
                 Actions = filter.Multiple ? ["setValue", "toggle", "clear", "reset"] : ["setValue", "reset"],
                 GetChoices = () => filter.Items
                     .Select(i => new AgentChoiceItem(i.Value, i.Label, filter.IsSelected(i.Value), i.Disabled))
@@ -140,7 +151,7 @@ public sealed partial class AgentBridgeService
                 ExecuteAction = (action, args) => Task.FromResult<StepResult>(action switch
                 {
                     "setValue" => SetFilterSelection(filter, args.Count > 0 ? args[0] : null),
-                    "toggle" => ToggleFilterValue(filter, args.Count > 0 ? args[0]?.ToString() : null),
+                    "toggle" => ToggleFilterValue(filter, args.Count > 0 && args[0].ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined) ? AgentArgs.ScalarText(args[0]) : null),
                     "clear" => SetFilterValues(filter, []),
                     "reset" => ResetFilter(filter),
                     _ => false,
@@ -153,7 +164,7 @@ public sealed partial class AgentBridgeService
             Ref = NextRef(),
             Component = "dashboard",
             Label = dashboard.Key,
-            GetValue = () => dashboard.CurrentView ?? "default",
+            GetValue = () => AgentValue.From(dashboard.CurrentView ?? "default"),
             Actions = ["setView", "resetFilters", "refresh"],
             GetChoices = () => dashboard.Views
                 .Select(v => new AgentChoiceItem(v.Key, v.Label, Selected: dashboard.CurrentView == v.Key))
@@ -198,14 +209,14 @@ public sealed partial class AgentBridgeService
         filter.Items.Any(i => string.Equals(i.Value, value, StringComparison.Ordinal) && !i.Disabled);
 
     // setValue: a string replaces the selection with that value; a list (multiple filters) replaces it with the list.
-    private static bool SetFilterSelection(DashboardFilterControl filter, object? arg)
+    private static bool SetFilterSelection(DashboardFilterControl filter, JsonElement? arg)
     {
         IReadOnlyList<string> wanted = arg switch
         {
             null => [],
-            string text => [text],
-            System.Collections.IEnumerable list => list.Cast<object?>().Select(v => v?.ToString() ?? "").ToList(),
-            _ => [arg.ToString() ?? ""],
+            { ValueKind: JsonValueKind.Null or JsonValueKind.Undefined } => [],
+            { ValueKind: JsonValueKind.Array } list => list.EnumerateArray().Select(AgentArgs.ScalarText).ToList(),
+            { } scalar => [AgentArgs.ScalarText(scalar)],
         };
         if (wanted.Count == 0) return false;
         if (!filter.Multiple)
@@ -256,7 +267,7 @@ public sealed partial class AgentBridgeService
             if (t.IsHidden?.Invoke() == true) continue;
             var offPage = t.IsOffPage?.Invoke() ?? false;
             if (!includeOffPage && offPage) continue;
-            var val = t.Sensitive ? RedactedValue : t.GetValue();
+            var val = ValueOf(t);
             results.Add(new AgentComponentSnapshot(
                 t.Ref,
                 t.Component,
@@ -348,7 +359,7 @@ public sealed partial class AgentBridgeService
     /// <see cref="AllowPolicy"/> and <paramref name="allow"/>. The first failing step stops the run; steps that
     /// already ran are not rolled back. Each successful step raises one <see cref="ObservedChange"/>. Failures,
     /// including an exception thrown while the action runs, are reported in <see cref="AgentActResult.Error"/>
-    /// rather than thrown.
+    /// rather than thrown; the text of such an exception goes to <see cref="Logger"/>, never to the model.
     /// </summary>
     /// <param name="steps">The steps to run, at most <see cref="MaxStepsPerAct"/>; more fail the call before any step runs.</param>
     /// <param name="allow">An extra gate for this call only, called with the same arguments before <see cref="AllowPolicy"/>, so a refusal here never prompts whoever <see cref="AllowPolicy"/> asks. It also counts as a policy for steps that need confirmation.</param>
@@ -360,7 +371,7 @@ public sealed partial class AgentBridgeService
     {
         ArgumentNullException.ThrowIfNull(steps);
         var outcomes = new List<AgentActStepOutcome>();
-        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var values = new Dictionary<string, AgentValue?>(StringComparer.Ordinal);
         if (steps.Count > MaxStepsPerAct)
         {
             return new AgentActResult(false, outcomes, values, $"Too many steps: {steps.Count} given, at most {MaxStepsPerAct} per call. Nothing ran; send fewer steps.");
@@ -414,18 +425,18 @@ public sealed partial class AgentBridgeService
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was refused by policy.");
             }
 
-            var stepArgs = new List<object?>();
+            var stepArgs = new List<JsonElement>();
             foreach (var arg in step.Args ?? [])
             {
-                var plain = AgentArgs.Unwrap(arg, out var argError);
-                if (argError is not null)
+                var json = arg.Json;
+                if (AgentArgs.ContainsObject(json))
                 {
-                    return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was rejected: {argError}");
+                    return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was rejected: An object is not a valid value.");
                 }
-                stepArgs.Add(plain);
+                stepArgs.Add(json);
             }
 
-            var previousValue = target.Sensitive ? RedactedValue : target.GetValue();
+            var previousValue = ValueOf(target);
             StepResult result;
             try
             {
@@ -433,11 +444,13 @@ public sealed partial class AgentBridgeService
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Failures are values: a step that throws (a controller hook, a bad argument) fails the run.
-                values[target.Ref] = target.Sensitive ? RedactedValue : target.GetValue();
-                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" failed: {ex.Message}");
+                // Failures are values: a step that throws (a controller hook, a bad argument) fails the run. The text of
+                // the exception stays with the host: it can hold a path, a query or a connection string.
+                AgentLog.ActionFailed(Logger ?? NullLogger.Instance, target.Ref, step.Action, ex);
+                values[target.Ref] = ValueOf(target);
+                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" failed: the application reported an error.");
             }
-            var currentValue = target.Sensitive ? RedactedValue : target.GetValue();
+            var currentValue = ValueOf(target);
             values[target.Ref] = currentValue;
 
             if (!result.Ok)
@@ -461,6 +474,9 @@ public sealed partial class AgentBridgeService
 
         return new AgentActResult(true, outcomes, values);
     }
+
+    // A sensitive component never reports its value.
+    private static AgentValue? ValueOf(BoundTarget target) => target.Sensitive ? AgentValue.From(RedactedValue) : target.GetValue();
 
     // Query has no includeOffPage flag, so it only describes components that are in effect and shown.
     private static bool IsUnreachable(BoundTarget t) => t.IsHidden?.Invoke() == true || t.IsOffPage?.Invoke() == true;

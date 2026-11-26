@@ -1,0 +1,1 @@
+[{"ref":"c4","component":"select","label":"Size","items":[{"value":"s","label":"Small","selected":false,"disabled":false},{"value":"m","label":"Medium","selected":true,"disabled":false},{"value":"l","label":"Large","selected":false,"disabled":true}],"more":0,"total":0,"offset":0}]

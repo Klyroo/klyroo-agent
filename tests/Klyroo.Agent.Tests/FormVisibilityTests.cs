@@ -4,19 +4,19 @@ namespace Klyroo.Agent.Tests;
 
 public sealed class FormVisibilityTests
 {
-    private static async Task<AgentActResult> Set(AgentBridgeService agent, string label, object? value) =>
+    private static async Task<AgentActResult> Set(AgentBridgeService agent, string label, AgentArgument value) =>
         await agent.ActAsync([new AgentActStep(label, "setValue", [value])]);
 
     [Fact]
     public async Task A_Hidden_field_is_not_listed_queried_addressed_or_written()
     {
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "f", Title = "F",
             Fields =
             [
-                new FormFieldSchema { Key = "name", Label = "Name" },
-                new FormFieldSchema { Key = "tenant", Label = "Tenant", Kind = FormFieldKind.Hidden, DefaultValue = "acme-42" },
+                new DynamicFieldSchema { Key = "name", Label = "Name" },
+                new DynamicFieldSchema { Key = "tenant", Label = "Tenant", Kind = FormFieldKind.Hidden, DefaultValue = "acme-42" },
             ],
         });
         var agent = new AgentBridgeService();
@@ -37,23 +37,23 @@ public sealed class FormVisibilityTests
     public async Task Fields_in_a_hidden_container_or_tab_are_neither_readable_nor_writable()
     {
         var showGroup = false;
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "f", Title = "F",
             Fields =
             [
-                new FormFieldSchema
+                new DynamicFieldSchema
                 {
                     Key = "g", Kind = FormFieldKind.Group, Condition = _ => showGroup,
-                    Fields = [new FormFieldSchema { Key = "inner", Label = "Inner", DefaultValue = "secret" }],
+                    Fields = [new DynamicFieldSchema { Key = "inner", Label = "Inner", DefaultValue = "secret" }],
                 },
-                new FormFieldSchema
+                new DynamicFieldSchema
                 {
                     Key = "t", Kind = FormFieldKind.Tabs,
                     Tabs =
                     [
-                        new FormTabItemSchema { Key = "a", Label = "A", Fields = [new FormFieldSchema { Key = "tabbed", Label = "Tabbed", DefaultValue = "shown" }] },
-                        new FormTabItemSchema { Key = "b", Label = "B", Condition = _ => false, Fields = [new FormFieldSchema { Key = "tabHidden", Label = "Tab hidden", DefaultValue = "nope" }] },
+                        new DynamicTabSchema { Key = "a", Label = "A", Fields = [new DynamicFieldSchema { Key = "tabbed", Label = "Tabbed", DefaultValue = "shown" }] },
+                        new DynamicTabSchema { Key = "b", Label = "B", Condition = _ => false, Fields = [new DynamicFieldSchema { Key = "tabHidden", Label = "Tab hidden", DefaultValue = "nope" }] },
                     ],
                 },
             ],
@@ -82,14 +82,14 @@ public sealed class FormVisibilityTests
     public async Task A_skipped_step_hides_its_fields_while_another_step_in_effect_is_off_page()
     {
         var skipSecond = true;
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "w", Title = "W",
             Steps =
             [
-                new FormStepSchema { Key = "one", Title = "One", Fields = [new FormFieldSchema { Key = "a", Label = "A" }] },
-                new FormStepSchema { Key = "two", Title = "Two", SkipWhen = _ => skipSecond, Fields = [new FormFieldSchema { Key = "b", Label = "B", DefaultValue = "private" }] },
-                new FormStepSchema { Key = "three", Title = "Three", Fields = [new FormFieldSchema { Key = "c", Label = "C" }] },
+                new DynamicStepSchema { Key = "one", Title = "One", Fields = [new DynamicFieldSchema { Key = "a", Label = "A" }] },
+                new DynamicStepSchema { Key = "two", Title = "Two", SkipWhen = _ => skipSecond, Fields = [new DynamicFieldSchema { Key = "b", Label = "B", DefaultValue = "private" }] },
+                new DynamicStepSchema { Key = "three", Title = "Three", Fields = [new DynamicFieldSchema { Key = "c", Label = "C" }] },
             ],
         });
         var agent = new AgentBridgeService();

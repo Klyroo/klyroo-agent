@@ -10,7 +10,11 @@
     <ProjectReference Include="..\..\src\Klyroo.Agent.AI\Klyroo.Agent.AI.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Golden\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Klyroo.Form" />
+    <Using Include="Klyroo.Form.Dynamic" />
     <Using Include="Klyroo.Dashboard" />
     <Using Include="Klyroo.Spreadsheet" />
   </ItemGroup>

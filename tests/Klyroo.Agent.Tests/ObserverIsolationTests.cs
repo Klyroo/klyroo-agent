@@ -9,13 +9,13 @@ public sealed class ObserverIsolationTests
     public async Task A_throwing_observer_does_not_abort_ActAsync_or_skip_other_observers()
     {
         var agent = new AgentBridgeService();
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "profile",
             Fields =
             [
-                new FormFieldSchema { Key = "name", Label = "Name" },
-                new FormFieldSchema { Key = "city", Label = "City" },
+                new DynamicFieldSchema { Key = "name", Label = "Name" },
+                new DynamicFieldSchema { Key = "city", Label = "City" },
             ]
         });
         agent.RegisterForm(form);

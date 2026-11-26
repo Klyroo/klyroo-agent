@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 
 namespace Klyroo.Agent;
 
@@ -79,7 +80,7 @@ public sealed partial class AgentBridgeService
     {
         var text = Normalize(request.Text);
         var filter = Normalize(request.Filter);
-        var records = new List<IReadOnlyDictionary<string, object?>>();
+        var records = new List<AgentRecord>();
 
         switch (Normalize(request.Collection))
         {
@@ -95,18 +96,16 @@ public sealed partial class AgentBridgeService
                         _ => false,
                     };
                     if (!keep) continue;
-                    var cells = row.Cells.ToDictionary(c => c.Key, c => (object?)c.Value.Text, StringComparer.Ordinal);
-                    if (text.Length > 0 && !cells.Values.Any(v => Normalize(v?.ToString()).Contains(text, StringComparison.Ordinal))) continue;
-                    records.Add(new Dictionary<string, object?>
-                    {
-                        ["rowNumber"] = row.RowNumber,
-                        ["status"] = row.Status.ToString().ToLowerInvariant(),
-                        ["importable"] = row.Importable,
-                        ["discardReason"] = row.DiscardReason?.ToString().ToLowerInvariant(),
-                        ["edited"] = row.Edited,
-                        ["cells"] = cells,
-                        ["issues"] = row.Issues.Select(IssueRecord).ToList(),
-                    });
+                    var cells = row.Cells.ToDictionary(c => c.Key, c => c.Value.Text ?? "", StringComparer.Ordinal);
+                    if (text.Length > 0 && !cells.Values.Any(v => Normalize(v).Contains(text, StringComparison.Ordinal))) continue;
+                    records.Add(new AgentRowRecord(
+                        row.RowNumber,
+                        row.Status.ToString().ToLowerInvariant(),
+                        row.Importable,
+                        row.DiscardReason?.ToString().ToLowerInvariant(),
+                        row.Edited,
+                        cells,
+                        [.. row.Issues.Select(i => IssueRecord(i))]));
                 }
                 break;
 
@@ -125,9 +124,7 @@ public sealed partial class AgentBridgeService
                         if (!keep) continue;
                         if (text.Length > 0 && !Normalize(issue.Message).Contains(text, StringComparison.Ordinal)
                             && !Normalize(issue.Field).Contains(text, StringComparison.Ordinal)) continue;
-                        var record = IssueRecord(issue);
-                        record["rowNumber"] = row.RowNumber;
-                        records.Add(record);
+                        records.Add(IssueRecord(issue, row.RowNumber));
                     }
                 }
                 break;
@@ -138,19 +135,17 @@ public sealed partial class AgentBridgeService
                     var column = field.Column;
                     if (text.Length > 0 && !Normalize(column.EffectiveLabel).Contains(text, StringComparison.Ordinal)
                         && !Normalize(column.Key).Contains(text, StringComparison.Ordinal)) continue;
-                    records.Add(new Dictionary<string, object?>
-                    {
-                        ["key"] = column.Key,
-                        ["label"] = column.EffectiveLabel,
-                        ["required"] = column.Required,
-                        ["editable"] = column.Editable,
-                        ["status"] = field.Status.ToString().ToLowerInvariant(),
-                        ["headerIndex"] = field.HeaderIndex,
-                        ["header"] = field.HeaderText,
-                        ["suggestedHeader"] = field.Suggestion?.HeaderText,
-                        ["suggestedHeaderIndex"] = field.Suggestion?.HeaderIndex,
-                        ["samples"] = field.Samples,
-                    });
+                    records.Add(new AgentColumnRecord(
+                        column.Key,
+                        column.EffectiveLabel,
+                        column.Required,
+                        column.Editable,
+                        field.Status.ToString().ToLowerInvariant(),
+                        field.HeaderIndex,
+                        field.HeaderText,
+                        field.Suggestion?.HeaderText,
+                        field.Suggestion?.HeaderIndex,
+                        [.. field.Samples]));
                 }
                 break;
 
@@ -161,12 +156,7 @@ public sealed partial class AgentBridgeService
                 for (var i = 0; i < importer.Headers.Count; i++)
                 {
                     if (text.Length > 0 && !Normalize(importer.Headers[i]).Contains(text, StringComparison.Ordinal)) continue;
-                    records.Add(new Dictionary<string, object?>
-                    {
-                        ["index"] = i,
-                        ["header"] = importer.Headers[i],
-                        ["usedBy"] = used.GetValueOrDefault(i),
-                    });
+                    records.Add(new AgentHeaderRecord(i, importer.Headers[i], used.GetValueOrDefault(i)));
                 }
                 break;
 
@@ -180,19 +170,17 @@ public sealed partial class AgentBridgeService
                         .Where(i => i >= 0 && i < importer.AllRows.Count)
                         .Select(i => importer.AllRows[i].RowNumber)
                         .ToList();
-                    records.Add(new Dictionary<string, object?>
-                    {
-                        ["field"] = question.FieldKey,
-                        ["fieldLabel"] = question.FieldLabel,
-                        ["rawValue"] = question.RawValue,
-                        ["open"] = question.IsOpen,
-                        ["answer"] = question.Answer?.Action.ToString(),
-                        ["mappedValue"] = question.Answer?.MappedValue,
-                        ["canCreate"] = question.CanCreate,
-                        ["rowCount"] = rowNumbers.Count,
-                        ["rowNumbers"] = rowNumbers.Take(MaxRowNumbersPerQuestion).ToList(),
-                        ["choices"] = question.Choices.Select(c => new Dictionary<string, object?> { ["value"] = c.Value, ["label"] = c.Label }).ToList(),
-                    });
+                    records.Add(new AgentQuestionRecord(
+                        question.FieldKey,
+                        question.FieldLabel,
+                        question.RawValue,
+                        question.IsOpen,
+                        question.Answer?.Action.ToString(),
+                        question.Answer?.MappedValue,
+                        question.CanCreate,
+                        rowNumbers.Count,
+                        [.. rowNumbers.Take(MaxRowNumbersPerQuestion)],
+                        [.. question.Choices.Select(c => new AgentQuestionChoice(c.Value, c.Label))]));
                 }
                 break;
 
@@ -205,13 +193,8 @@ public sealed partial class AgentBridgeService
         return new RecordPage(records.Skip(offset).Take(limit).ToList(), records.Count);
     }
 
-    private static Dictionary<string, object?> IssueRecord(SpreadsheetRowIssue issue) => new()
-    {
-        ["field"] = issue.Field,
-        ["code"] = issue.Code,
-        ["level"] = Level(issue.Level),
-        ["message"] = issue.Message,
-    };
+    private static AgentIssueRecord IssueRecord(SpreadsheetRowIssue issue, int? rowNumber = null) =>
+        new(issue.Field, issue.Code, Level(issue.Level), issue.Message, rowNumber);
 
     private static SpreadsheetColumnSchema? FindColumn(SpreadsheetImporter importer, string? name)
     {
@@ -224,11 +207,11 @@ public sealed partial class AgentBridgeService
     }
 
     // Reads row numbers from separate arguments or from one list. Duplicates are dropped; one pass, linear in the arguments.
-    private static bool ParseRowNumbers(IReadOnlyList<object?> args, out List<int> rowNumbers, out string? error)
+    private static bool ParseRowNumbers(IReadOnlyList<JsonElement> args, out List<int> rowNumbers, out string? error)
     {
         rowNumbers = [];
         error = null;
-        var raw = args.Count == 1 && args[0] is List<object?> list ? list : args;
+        IReadOnlyList<JsonElement> raw = args.Count == 1 && args[0].ValueKind == JsonValueKind.Array ? [.. args[0].EnumerateArray()] : args;
         if (raw.Count == 0)
         {
             error = "give at least one row number.";
@@ -239,7 +222,7 @@ public sealed partial class AgentBridgeService
         {
             if (!AgentArgs.TryInt(item, out var number))
             {
-                error = $"\"{item}\" is not a row number.";
+                error = $"\"{AgentArgs.ScalarText(item)}\" is not a row number.";
                 return false;
             }
             if (seen.Add(number)) rowNumbers.Add(number);
@@ -248,7 +231,7 @@ public sealed partial class AgentBridgeService
     }
 
     // Maps row numbers to importer indexes with one dictionary over the rows, so a large list costs rows + numbers, not rows x numbers.
-    private static bool TryRowIndexes(SpreadsheetImporter importer, IReadOnlyList<object?> args, out List<int> indexes, out List<int> numbers, out string? error)
+    private static bool TryRowIndexes(SpreadsheetImporter importer, IReadOnlyList<JsonElement> args, out List<int> indexes, out List<int> numbers, out string? error)
     {
         indexes = [];
         if (!ParseRowNumbers(args, out numbers, out error)) return false;
@@ -269,7 +252,7 @@ public sealed partial class AgentBridgeService
         return true;
     }
 
-    private static async Task<StepResult> ExecuteSpreadsheetAction(SpreadsheetImporter importer, string action, IReadOnlyList<object?> args)
+    private static async Task<StepResult> ExecuteSpreadsheetAction(SpreadsheetImporter importer, string action, IReadOnlyList<JsonElement> args)
     {
         switch (action)
         {
@@ -279,7 +262,7 @@ public sealed partial class AgentBridgeService
                 if (column is null) return StepResult.Fail($"\"{AgentArgs.Text(args, 0)}\" is not a column of this import. Use query with collection \"columns\".");
                 if (!importer.FileLoaded) return StepResult.Fail("no file is loaded.");
                 int headerIndex;
-                if (args.Count > 1 && args[1] is not string && AgentArgs.IsNumber(args[1]) && AgentArgs.TryInt(args[1], out headerIndex))
+                if (args.Count > 1 && AgentArgs.IsNumber(args[1]) && AgentArgs.TryInt(args[1], out headerIndex))
                 {
                     if (headerIndex < 0 || headerIndex >= importer.Headers.Count)
                         return StepResult.Fail($"the file has no column with index {headerIndex}. Use query with collection \"headers\".");
@@ -317,12 +300,13 @@ public sealed partial class AgentBridgeService
                 var column = FindColumn(importer, AgentArgs.Text(args, 1));
                 if (column is null) return StepResult.Fail($"\"{AgentArgs.Text(args, 1)}\" is not a column of this import.");
                 if (!column.Editable) return StepResult.Fail($"the column \"{column.EffectiveLabel}\" is not editable.");
-                var text = args[2] switch
+                var text = args[2].ValueKind switch
                 {
-                    null => "",
-                    string s => s,
-                    bool b => b ? "true" : "false",
-                    { } n when AgentArgs.IsNumber(n) => AgentArgs.NumberText(n), // the digits as sent: 12345678901234567890 stays that text
+                    JsonValueKind.Null or JsonValueKind.Undefined => "",
+                    JsonValueKind.String => args[2].GetString(),
+                    JsonValueKind.True => "true",
+                    JsonValueKind.False => "false",
+                    JsonValueKind.Number => args[2].GetRawText(), // the digits as sent: 12345678901234567890 stays that text
                     _ => null,
                 };
                 if (text is null) return StepResult.Fail("the cell text must be text, a number or a boolean.");
@@ -358,7 +342,7 @@ public sealed partial class AgentBridgeService
         }
     }
 
-    private static StepResult AnswerValue(SpreadsheetImporter importer, IReadOnlyList<object?> args)
+    private static StepResult AnswerValue(SpreadsheetImporter importer, IReadOnlyList<JsonElement> args)
     {
         var column = FindColumn(importer, AgentArgs.Text(args, 0));
         if (column is null) return StepResult.Fail($"\"{AgentArgs.Text(args, 0)}\" is not a column of this import.");

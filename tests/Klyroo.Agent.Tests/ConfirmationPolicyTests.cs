@@ -4,14 +4,14 @@ namespace Klyroo.Agent.Tests;
 
 public sealed class ConfirmationPolicyTests
 {
-    private static (AgentBridgeService Agent, FormController Form, int[] Submits) ConfirmedForm()
+    private static (AgentBridgeService Agent, DynamicFormController Form, int[] Submits) ConfirmedForm()
     {
         var submits = new int[1];
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "pay",
             Title = "Payment",
-            Fields = [new FormFieldSchema { Key = "amount", Label = "Amount", Kind = FormFieldKind.Number }],
+            Fields = [new DynamicFieldSchema { Key = "amount", Label = "Amount", Kind = FormFieldKind.Number }],
             OnSubmit = _ =>
             {
                 submits[0]++;
@@ -98,12 +98,7 @@ public sealed class ConfirmationPolicyTests
     [Fact]
     public async Task A_spreadsheet_submit_and_clearFile_are_refused_by_default_and_editCell_is_not()
     {
-        var importer = new SpreadsheetImporter(new SpreadsheetSchema
-        {
-            Key = "people",
-            Columns = [new SpreadsheetColumnSchema { Key = "name", Label = "Name" }],
-            OnSubmit = _ => Task.FromResult<IReadOnlyList<SpreadsheetRejectedRow>?>([]),
-        });
+        var importer = new SpreadsheetImporter<PersonRow>(TestSheets.Names("people", onSubmit: _ => Task.FromResult<IReadOnlyList<SpreadsheetRejectedRow>?>([])));
         importer.LoadText("Name\nAda", "p.csv");
         var agent = new AgentBridgeService();
         agent.RegisterSpreadsheet(importer);
@@ -123,14 +118,14 @@ public sealed class ConfirmationPolicyTests
     [Fact]
     public async Task Moving_between_steps_of_a_form_never_needs_confirmation()
     {
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "wizard",
             Title = "Wizard",
             Steps =
             [
-                new FormStepSchema { Key = "one", Title = "One", Fields = [new FormFieldSchema { Key = "a", Label = "A" }] },
-                new FormStepSchema { Key = "two", Title = "Two", Fields = [new FormFieldSchema { Key = "b", Label = "B" }] },
+                new DynamicStepSchema { Key = "one", Title = "One", Fields = [new DynamicFieldSchema { Key = "a", Label = "A" }] },
+                new DynamicStepSchema { Key = "two", Title = "Two", Fields = [new DynamicFieldSchema { Key = "b", Label = "B" }] },
             ],
         });
         var agent = new AgentBridgeService();
@@ -197,10 +192,10 @@ public sealed class ConfirmationPolicyTests
     public async Task A_form_registered_with_the_default_requires_confirmation_to_submit()
     {
         var submits = 0;
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "f", Title = "F",
-            Fields = [new FormFieldSchema { Key = "a", Label = "A" }],
+            Fields = [new DynamicFieldSchema { Key = "a", Label = "A" }],
             OnSubmit = _ =>
             {
                 submits++;

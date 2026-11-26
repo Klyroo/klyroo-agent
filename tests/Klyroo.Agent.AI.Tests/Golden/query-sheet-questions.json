@@ -1,0 +1,1 @@
+[{"ref":"c13","component":"spreadsheet","label":"people","items":[],"more":0,"records":[{"field":"team","fieldLabel":"Team","rawValue":"Kernel","open":true,"answer":null,"mappedValue":null,"canCreate":false,"rowCount":1,"rowNumbers":[4],"choices":[{"value":"engine","label":"Engine"},{"value":"ops","label":"Operations"}]}],"total":1,"offset":0}]

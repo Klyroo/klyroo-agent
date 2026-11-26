@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <ProjectReference Include="..\Klyroo.Agent.Core\Klyroo.Agent.Core.csproj" />
     <ProjectReference Include="..\..\..\klyroo-form\src\Klyroo.Form.Core\Klyroo.Form.Core.csproj" />
     <ProjectReference Include="..\..\..\klyroo-dashboard\src\Klyroo.Dashboard.Core\Klyroo.Dashboard.Core.csproj" />

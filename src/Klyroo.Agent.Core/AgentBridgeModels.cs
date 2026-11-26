@@ -42,8 +42,8 @@ public sealed record ObservedChange(
     string Ref,
     string Label,
     string Key,
-    object? Previous,
-    object? Value,
+    AgentValue? Previous,
+    AgentValue? Value,
     string Reason,
     AgentChangeSource Source,
     string? Row = null);
@@ -52,7 +52,7 @@ public sealed record ObservedChange(
 /// <param name="Ref">The stable reference (<c>c1</c>, <c>c2</c>, ...) used to address the component in an action step.</param>
 /// <param name="Component">The component kind: <c>input</c>, <c>select</c>, <c>checkbox</c>, <c>number</c>, <c>form</c>, <c>dashboard</c> or <c>spreadsheet</c>.</param>
 /// <param name="Label">The human-readable label an agent can also use to address the component.</param>
-/// <param name="Value">The current value, or <c>"[redacted]"</c> for a sensitive field.</param>
+/// <param name="Value">The current value, or the text <c>"[redacted]"</c> for a sensitive field. <see langword="null"/> when the component has no value, such as an empty field.</param>
 /// <param name="Actions">The action names the component accepts in <see cref="AgentActStep.Action"/>.</param>
 /// <param name="Disabled">Whether the component currently rejects actions.</param>
 /// <param name="OffPage">Whether the component is not rendered right now, for example a conditional form field whose condition is false.</param>
@@ -62,7 +62,7 @@ public sealed record AgentComponentSnapshot(
     string Ref,
     string Component,
     string Label,
-    object? Value,
+    AgentValue? Value,
     IReadOnlyList<string> Actions,
     bool Disabled = false,
     bool OffPage = false,
@@ -86,7 +86,7 @@ public sealed record AgentChoiceItem(
 /// <param name="Label">The component label.</param>
 /// <param name="Items">At most 50 matching choices.</param>
 /// <param name="More">How many matching choices were left out because of the 50 item limit.</param>
-/// <param name="Records">One page of the collection named by <see cref="AgentQueryRequest.Collection"/>, each record a map of field names to values. <see langword="null"/> when no collection was requested.</param>
+/// <param name="Records">One page of the collection named by <see cref="AgentQueryRequest.Collection"/>: <see cref="AgentRowRecord"/>, <see cref="AgentIssueRecord"/>, <see cref="AgentColumnRecord"/>, <see cref="AgentHeaderRecord"/> or <see cref="AgentQuestionRecord"/>, by collection. <see langword="null"/> when no collection was requested.</param>
 /// <param name="Total">How many records the collection holds after filtering, so a caller knows whether to ask for the next page. 0 when <paramref name="Records"/> is <see langword="null"/>.</param>
 /// <param name="Offset">The index of the first record of <paramref name="Records"/> in the filtered collection.</param>
 public sealed record AgentQueryMatch(
@@ -95,7 +95,7 @@ public sealed record AgentQueryMatch(
     string Label,
     IReadOnlyList<AgentChoiceItem> Items,
     int More = 0,
-    IReadOnlyList<IReadOnlyDictionary<string, object?>>? Records = null,
+    IReadOnlyList<AgentRecord>? Records = null,
     int Total = 0,
     int Offset = 0);
 
@@ -144,7 +144,7 @@ public sealed class AgentQueryRequest
 
 /// <summary>
 /// What an agent needs to know about a spreadsheet import to decide the next action, without the rows. It is the
-/// <see cref="AgentComponentSnapshot.Value"/> of a spreadsheet component; page through rows and issues with
+/// <see cref="AgentComponentSnapshot.Value"/> of a spreadsheet component, so it is an <see cref="AgentValue"/>; page through rows and issues with
 /// <c>AgentBridgeService.Query</c>.
 /// </summary>
 /// <param name="Step">The wizard step in progress: <c>file</c>, <c>columns</c>, <c>values</c>, <c>review</c> or <c>submit</c>.</param>
@@ -175,27 +175,27 @@ public sealed record AgentSpreadsheetSummary(
     bool CanSubmit,
     string SubmitStatus,
     int ImportedCount,
-    string? SubmitError);
+    string? SubmitError) : AgentValue;
 
 /// <summary>One action to run in an <c>AgentBridgeService.ActAsync</c> call.</summary>
 /// <param name="Ref">A component reference such as <c>c2</c>, or a component label.</param>
 /// <param name="Action">The action name, which must be one of the component's <see cref="AgentComponentSnapshot.Actions"/>.</param>
-/// <param name="Args">The action arguments, for example the new value for <c>setValue</c>. <see langword="null"/> means no arguments.</param>
+/// <param name="Args">The action arguments, for example the new value for <c>setValue</c>. Plain values convert to <see cref="AgentArgument"/>, so <c>["Klyroo"]</c> and <c>[12]</c> work. <see langword="null"/> means no arguments.</param>
 public sealed record AgentActStep(
     string Ref,
     string Action,
-    IReadOnlyList<object?>? Args = null);
+    IReadOnlyList<AgentArgument>? Args = null);
 
 /// <summary>The outcome of one step that ran successfully, listed in <see cref="AgentActResult.Steps"/>.</summary>
 /// <param name="Ref">The reference of the component the step ran on.</param>
 /// <param name="Action">The action that ran.</param>
 /// <param name="Ok">Always <see langword="true"/> for steps the bridge lists.</param>
-/// <param name="Value">The component value after the step, or <c>"[redacted]"</c> for a sensitive field.</param>
+/// <param name="Value">The component value after the step, or the text <c>"[redacted]"</c> for a sensitive field. <see langword="null"/> when the component has no value.</param>
 public sealed record AgentActStepOutcome(
     string Ref,
     string Action,
     bool Ok,
-    object? Value);
+    AgentValue? Value);
 
 /// <summary>
 /// The result of <c>AgentBridgeService.ActAsync</c>. Steps run in order and the first failure stops the run, so
@@ -208,8 +208,8 @@ public sealed record AgentActStepOutcome(
 public sealed record AgentActResult(
     bool Ok,
     IReadOnlyList<AgentActStepOutcome> Steps,
-    IReadOnlyDictionary<string, object?> Values,
-    string? Error = null);
+    IReadOnlyDictionary<string, AgentValue?> Values,
+    string? Error = null) : AgentToolResult;
 
 /// <summary>
 /// Describes one agent tool (<c>snapshot</c>, <c>query</c> or <c>act</c>) so you can expose it to an LLM or an MCP
@@ -235,7 +235,7 @@ public sealed record AgentToolDefinition(
 /// the message and correct the call.
 /// </summary>
 /// <param name="Error">What was wrong with the call.</param>
-public sealed record AgentToolError(string Error);
+public sealed record AgentToolError(string Error) : AgentToolResult;
 
 /// <summary>
 /// A bounded undo and redo history of immutable snapshots. It is independent of the agent bridge: use it for any

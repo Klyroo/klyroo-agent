@@ -13,19 +13,19 @@ public sealed class AgentUiSdkTests
         using var provider = services.BuildServiceProvider();
         var agent = provider.GetRequiredService<AgentBridgeService>();
 
-        var formSchema = new FormSchema
+        var formSchema = new DynamicFormSchema
         {
             FormKey = "project-settings",
             Title = "Project Settings",
             Fields =
             [
-                new FormFieldSchema
+                new DynamicFieldSchema
                 {
                     Key = "projectName",
                     Label = "Project name",
                     DefaultValue = "Apollo"
                 },
-                new FormFieldSchema
+                new DynamicFieldSchema
                 {
                     Key = "region",
                     Label = "Région",
@@ -38,7 +38,7 @@ public sealed class AgentUiSdkTests
                         new FormOptionItem("ap-south", "Asia Pacific")
                     ]
                 },
-                new FormFieldSchema
+                new DynamicFieldSchema
                 {
                     Key = "apiToken",
                     Label = "API Secret",
@@ -48,7 +48,7 @@ public sealed class AgentUiSdkTests
             ]
         };
 
-        var form = new FormController(formSchema);
+        var form = new DynamicFormController(formSchema);
         agent.RegisterForm(form, confirmSubmit: true);
 
         var dashboard = new DashboardController("sales");
@@ -63,11 +63,11 @@ public sealed class AgentUiSdkTests
         var snap = agent.Snapshot();
         Assert.Equal(6, snap.Count);
         var projectSnap = snap.First(s => s.Label == "Project name");
-        Assert.Equal("Apollo", projectSnap.Value);
+        Assert.Equal(AgentValue.From("Apollo"), projectSnap.Value);
         Assert.Contains("setValue", projectSnap.Actions);
 
         var secretSnap = snap.First(s => s.Label == "API Secret");
-        Assert.Equal(AgentBridgeService.RedactedValue, secretSnap.Value);
+        Assert.Equal(AgentValue.From(AgentBridgeService.RedactedValue), secretSnap.Value);
 
         // 2. Query inspects choices inside a select (matching accent-insensitively "region") without opening popups
         var regionQuery = agent.Query(new AgentQueryRequest { Within = "region", Text = "Europe" });
@@ -96,13 +96,13 @@ public sealed class AgentUiSdkTests
 
         Assert.Equal(4, observed.Count);
         Assert.Equal(AgentChangeSource.Agent, observed[0].Source);
-        Assert.Equal("Apollo", observed[0].Previous);
-        Assert.Equal("Atlas", observed[0].Value);
+        Assert.Equal(AgentValue.From("Apollo"), observed[0].Previous);
+        Assert.Equal(AgentValue.From("Atlas"), observed[0].Value);
 
         // Password change in observed stream must have both Previous and Value redacted
         var secretChange = observed[2];
-        Assert.Equal(AgentBridgeService.RedactedValue, secretChange.Previous);
-        Assert.Equal(AgentBridgeService.RedactedValue, secretChange.Value);
+        Assert.Equal(AgentValue.From(AgentBridgeService.RedactedValue), secretChange.Previous);
+        Assert.Equal(AgentValue.From(AgentBridgeService.RedactedValue), secretChange.Value);
 
         // 5. Permission gate blocks consequential confirm-required step when policy returns false
         var denied = await agent.ActAsync(

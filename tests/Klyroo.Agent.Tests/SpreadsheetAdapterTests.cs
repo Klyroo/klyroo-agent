@@ -8,43 +8,27 @@ public sealed class SpreadsheetAdapterTests
     private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
     // Header is row 1; Ada, Grace and Linus are rows 2, 3 and 4. "Grace" has an invalid age, "Linus" an unknown team.
-    private static (AgentBridgeService Agent, SpreadsheetImporter Importer, string Ref, List<IReadOnlyList<SpreadsheetRow>> Submitted) Setup(
+    private static (AgentBridgeService Agent, SpreadsheetImporter<PersonRow> Importer, string Ref, List<IReadOnlyList<SpreadsheetRow<PersonRow>>> Submitted) Setup(
         string csv = "Full name;Years;Team\nAda;36;Engine\nGrace;abc;Engine\nLinus;54;Kernel",
         bool requireYears = false,
-        Func<string, SpreadsheetOption>? create = null)
+        Func<string, SpreadsheetOption<string?>>? create = null)
     {
-        var submitted = new List<IReadOnlyList<SpreadsheetRow>>();
-        var importer = new SpreadsheetImporter(new SpreadsheetSchema
+        var submitted = new List<IReadOnlyList<SpreadsheetRow<PersonRow>>>();
+        var importer = new SpreadsheetImporter<PersonRow>(TestSheets.People(requireYears, create, rows =>
         {
-            Key = "people",
-            Columns =
-            [
-                new SpreadsheetColumnSchema { Key = "name", Label = "Name", Required = true, Headers = ["Full name"] },
-                new SpreadsheetColumnSchema { Key = "age", Label = "Age", Kind = SpreadsheetColumnKind.Number, Required = requireYears, Headers = ["Years"] },
-                new SpreadsheetColumnSchema
-                {
-                    Key = "team", Label = "Team", Kind = SpreadsheetColumnKind.Select,
-                    Options = [new("engine", "Engine"), new("ops", "Operations")],
-                    OnCreateOption = create,
-                },
-                new SpreadsheetColumnSchema { Key = "id", Label = "Id", Editable = false, Headers = ["Never"] },
-            ],
-            OnSubmit = rows =>
-            {
-                submitted.Add(rows);
-                return Task.FromResult<IReadOnlyList<SpreadsheetRejectedRow>?>([]);
-            },
-        });
+            submitted.Add(rows);
+            return Task.FromResult<IReadOnlyList<SpreadsheetRejectedRow>?>([]);
+        }));
         importer.LoadText(csv, "people.csv");
         var agent = new AgentBridgeService();
         agent.RegisterSpreadsheet(importer);
         return (agent, importer, agent.Snapshot().Single().Ref, submitted);
     }
 
-    private static Task<AgentActResult> Act(AgentBridgeService agent, string action, params object?[] args) =>
+    private static Task<AgentActResult> Act(AgentBridgeService agent, string action, params AgentArgument[] args) =>
         agent.ActAsync([new AgentActStep("people", action, args)]);
 
-    private static IReadOnlyDictionary<string, object?> Record(AgentQueryMatch match, int index) => match.Records![index];
+    private static T Record<T>(AgentQueryMatch match, int index) where T : AgentRecord => Assert.IsType<T>(match.Records![index]);
 
     [Fact]
     public void The_snapshot_value_is_a_summary_with_counts_questions_and_unmapped_required_columns()
@@ -79,7 +63,7 @@ public sealed class SpreadsheetAdapterTests
     [Fact]
     public void An_empty_importer_has_a_summary_of_zeros()
     {
-        var importer = new SpreadsheetImporter(new SpreadsheetSchema { Key = "empty", Columns = [new SpreadsheetColumnSchema { Key = "a" }] });
+        var importer = new SpreadsheetImporter<PersonRow>(TestSheets.OneColumn("empty"));
         var agent = new AgentBridgeService();
         agent.RegisterSpreadsheet(importer);
 
@@ -99,15 +83,15 @@ public sealed class SpreadsheetAdapterTests
         var first = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "rows", Limit = 10 }));
         Assert.Equal(30, first.Total);
         Assert.Equal(10, first.Records!.Count);
-        Assert.Equal(2, Record(first, 0)["rowNumber"]);
+        Assert.Equal(2, Record<AgentRowRecord>(first, 0).RowNumber);
 
         var third = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "rows", Limit = 10, Offset = 20 }));
-        Assert.Equal(22, Record(third, 0)["rowNumber"]);
+        Assert.Equal(22, Record<AgentRowRecord>(third, 0).RowNumber);
         Assert.Equal(20, third.Offset);
 
         var search = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "rows", Text = "person 7" }));
         Assert.Equal(1, search.Total);
-        Assert.Equal(8, Record(search, 0)["rowNumber"]);
+        Assert.Equal(8, Record<AgentRowRecord>(search, 0).RowNumber);
 
         var defaultSize = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "rows" }));
         Assert.Equal(25, defaultSize.Records!.Count);
@@ -121,12 +105,12 @@ public sealed class SpreadsheetAdapterTests
         var (agent, _, _, _) = Setup();
 
         var invalid = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "rows", Filter = "invalid" }));
-        Assert.Equal(3, Record(invalid, 0)["rowNumber"]);
+        Assert.Equal(3, Record<AgentRowRecord>(invalid, 0).RowNumber);
 
         var issues = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "issues", Filter = "blocking" }));
         Assert.True(issues.Total >= 1);
-        Assert.All(issues.Records!, r => Assert.Equal("error", r["level"]));
-        Assert.Contains(issues.Records!, r => Equals(r["rowNumber"], 3));
+        Assert.All(issues.Records!, r => Assert.Equal("error", Assert.IsType<AgentIssueRecord>(r).Level));
+        Assert.Contains(issues.Records!, r => ((AgentIssueRecord)r).RowNumber == 3);
     }
 
     [Fact]
@@ -136,18 +120,19 @@ public sealed class SpreadsheetAdapterTests
 
         var columns = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "columns" }));
         Assert.Equal(4, columns.Total);
-        var team = columns.Records!.Single(r => (string?)r["key"] == "team");
-        Assert.Equal("Team", team["header"]);
+        var team = columns.Records!.Cast<AgentColumnRecord>().Single(r => r.Key == "team");
+        Assert.Equal("Team", team.Header);
 
         var headers = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "headers" }));
-        Assert.Equal(["Full name", "Years", "Team"], headers.Records!.Select(r => (string?)r["header"]));
-        Assert.Equal("team", headers.Records![2]["usedBy"]);
+        Assert.Equal(["Full name", "Years", "Team"], headers.Records!.Cast<AgentHeaderRecord>().Select(r => r.Header));
+        Assert.Equal("team", Record<AgentHeaderRecord>(headers, 2).UsedBy);
 
         var questions = Assert.Single(agent.Query(new AgentQueryRequest { Within = "people", Collection = "questions", Filter = "open" }));
         var question = Assert.Single(questions.Records!);
-        Assert.Equal("Kernel", question["rawValue"]);
-        Assert.Equal([4], Assert.IsAssignableFrom<IEnumerable<int>>(question["rowNumbers"]));
-        Assert.Equal(["engine", "ops"], Assert.IsAssignableFrom<IEnumerable<Dictionary<string, object?>>>(question["choices"]).Select(c => (string?)c["value"]));
+        var kernel = Assert.IsType<AgentQuestionRecord>(question);
+        Assert.Equal("Kernel", kernel.RawValue);
+        Assert.Equal([4], kernel.RowNumbers);
+        Assert.Equal(["engine", "ops"], kernel.Choices.Select(c => c.Value));
     }
 
     [Fact]
@@ -274,7 +259,7 @@ public sealed class SpreadsheetAdapterTests
     [Fact]
     public async Task AnswerValue_create_works_when_the_column_can_create_options()
     {
-        var (agent, importer, _, _) = Setup(create: text => new SpreadsheetOption(text.ToLowerInvariant(), text));
+        var (agent, importer, _, _) = Setup(create: text => new SpreadsheetOption<string?>(text.ToLowerInvariant(), text));
 
         var created = await Act(agent, "answerValue", "Team", "Kernel", "create");
 
@@ -346,14 +331,14 @@ public sealed class SpreadsheetAdapterTests
     }
 
     [Fact]
-    public async Task Submit_reports_the_error_of_a_callback_that_throws()
+    public async Task Submit_does_not_give_the_text_of_a_host_exception_to_the_model()
     {
-        var importer = new SpreadsheetImporter(new SpreadsheetSchema
+        var importer = new SpreadsheetImporter<PersonRow>(SpreadsheetSchema.For<PersonRow>(s =>
         {
-            Key = "people",
-            Columns = [new SpreadsheetColumnSchema { Key = "name" }],
-            OnSubmit = _ => throw new InvalidOperationException("quota exceeded"),
-        });
+            s.Key = "people";
+            s.OnSubmit = _ => throw new InvalidOperationException("quota exceeded at db.internal:5432");
+            s.Column(r => r.Name, c => c.Key("name"));
+        }));
         importer.LoadText("Name\nAda", "p.csv");
         var agent = new AgentBridgeService { AllowPolicy = (_, _) => Task.FromResult(true) };
         agent.RegisterSpreadsheet(importer);
@@ -361,7 +346,32 @@ public sealed class SpreadsheetAdapterTests
         var result = await Act(agent, "submit");
 
         Assert.False(result.Ok);
-        Assert.Contains("quota exceeded", result.Error);
+        Assert.DoesNotContain("quota exceeded", result.Error);
+        Assert.DoesNotContain("db.internal", result.Error);
+        Assert.Contains("status Error", result.Error);
+        var summary = Assert.IsType<AgentSpreadsheetSummary>(agent.Snapshot().Single().Value);
+        Assert.Equal("Error", summary.SubmitStatus);
+        Assert.Null(summary.SubmitError);
+    }
+
+    [Fact]
+    public async Task Submit_reports_the_message_of_a_SpreadsheetUserMessageException()
+    {
+        var importer = new SpreadsheetImporter<PersonRow>(SpreadsheetSchema.For<PersonRow>(s =>
+        {
+            s.Key = "people";
+            s.OnSubmit = _ => throw new SpreadsheetUserMessageException("The import window is closed.");
+            s.Column(r => r.Name, c => c.Key("name"));
+        }));
+        importer.LoadText("Name\nAda", "p.csv");
+        var agent = new AgentBridgeService { AllowPolicy = (_, _) => Task.FromResult(true) };
+        agent.RegisterSpreadsheet(importer);
+
+        var result = await Act(agent, "submit");
+
+        Assert.False(result.Ok);
+        Assert.Contains("The import window is closed.", result.Error);
+        Assert.Equal("The import window is closed.", Assert.IsType<AgentSpreadsheetSummary>(agent.Snapshot().Single().Value).SubmitError);
     }
 
     [Fact]
@@ -428,17 +438,17 @@ public sealed class SpreadsheetAdapterTests
     {
         var csv = "Full name;Years;Team\n" + string.Join("\n", Enumerable.Range(1, 5000).Select(i => $"P{i};{i};Engine"));
         var (agent, importer, _, _) = Setup(csv);
-        var numbers = Enumerable.Range(2, 5000).Concat(Enumerable.Range(2, 100)).Select(n => (object?)n).ToList();
+        var numbers = Enumerable.Range(2, 5000).Concat(Enumerable.Range(2, 100)).ToList();
 
-        var discarded = await agent.ActAsync([new AgentActStep("people", "discardRows", [numbers])]);
+        var discarded = await agent.ActAsync([new AgentActStep("people", "discardRows", [AgentArgument.List(numbers)])]);
         Assert.True(discarded.Ok, discarded.Error);
         Assert.Equal(5000, importer.DiscardedRows.Count);
 
-        var restored = await agent.ActAsync([new AgentActStep("people", "restoreRows", [numbers])]);
+        var restored = await agent.ActAsync([new AgentActStep("people", "restoreRows", [AgentArgument.List(numbers)])]);
         Assert.True(restored.Ok, restored.Error);
         Assert.Empty(importer.DiscardedRows);
 
-        var unknown = await agent.ActAsync([new AgentActStep("people", "discardRows", [new List<object?> { 2, 6000, 6001 }])]);
+        var unknown = await agent.ActAsync([new AgentActStep("people", "discardRows", [AgentArgument.List(new[] { 2, 6000, 6001 })])]);
         Assert.False(unknown.Ok);
         Assert.Contains("6000, 6001", unknown.Error);
         Assert.Empty(importer.DiscardedRows);

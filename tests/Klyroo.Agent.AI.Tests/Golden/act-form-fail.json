@@ -1,0 +1,1 @@
+{"ok":false,"steps":[{"ref":"c1","action":"setValue","ok":true,"value":"Zed"}],"values":{"c1":"Zed","c2":12.5},"error":"Step 2: action \u0022setValue\u0022 on \u0022Quantity\u0022 was rejected: \u0022qty\u0022 expects a finite number (invariant format such as 12.5), got \u0022abc\u0022.."}

@@ -1,0 +1,1 @@
+[{"ref":"c13","component":"spreadsheet","label":"people","items":[],"more":0,"records":[{"index":0,"header":"Full name","usedBy":"name"},{"index":1,"header":"Years","usedBy":"age"},{"index":2,"header":"Team","usedBy":"team"}],"total":3,"offset":0}]

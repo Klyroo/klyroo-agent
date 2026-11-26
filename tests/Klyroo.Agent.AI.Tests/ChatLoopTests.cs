@@ -38,17 +38,17 @@ public sealed class ChatLoopTests
     private static string ToolResultText(IReadOnlyList<ChatMessage> messages) =>
         string.Join("\n", messages.SelectMany(m => m.Contents).OfType<FunctionResultContent>().Select(r => r.Result?.ToString()));
 
-    private static (AgentBridgeService Bridge, FormController Form, int[] Submits) Refund()
+    private static (AgentBridgeService Bridge, DynamicFormController Form, int[] Submits) Refund()
     {
         var submits = new int[1];
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "refund",
             Title = "Refund",
             Fields =
             [
-                new FormFieldSchema { Key = "amount", Label = "Amount", Kind = FormFieldKind.Number },
-                new FormFieldSchema { Key = "reason", Label = "Reason", Kind = FormFieldKind.Select, Options = [new("damaged", "Damaged"), new("late", "Late")] },
+                new DynamicFieldSchema { Key = "amount", Label = "Amount", Kind = FormFieldKind.Number },
+                new DynamicFieldSchema { Key = "reason", Label = "Reason", Kind = FormFieldKind.Select, Options = [new("damaged", "Damaged"), new("late", "Late")] },
             ],
             OnSubmit = _ =>
             {

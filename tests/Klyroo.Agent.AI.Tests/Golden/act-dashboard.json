@@ -1,0 +1,1 @@
+{"ok":true,"steps":[{"ref":"c10","action":"setValue","ok":true,"value":"amer"},{"ref":"c11","action":"toggle","ok":true,"value":["web","shop"]},{"ref":"c12","action":"setView","ok":true,"value":"cohorts"}],"values":{"c10":"amer","c11":["web","shop"],"c12":"cohorts"}}

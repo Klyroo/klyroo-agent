@@ -1,0 +1,1 @@
+[{"ref":"c13","component":"spreadsheet","label":"people","items":[],"more":0,"records":[{"field":"age","code":"number","level":"error","message":"\u0022abc\u0022 is not a number","rowNumber":3},{"field":"team","code":"value.unknown","level":"error","message":"\u0022Kernel\u0022 is not a known value \u00B7 choose it in Values","rowNumber":4}],"total":2,"offset":0}]

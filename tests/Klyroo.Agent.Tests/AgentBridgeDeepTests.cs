@@ -12,26 +12,26 @@ public sealed class AgentBridgeDeepTests
     public async Task AgentBridge_supports_Form_toggle_clear_reset_and_stepped_wizard_navigation()
     {
         var agent = new AgentBridgeService();
-        var wizard = new FormController(new FormSchema
+        var wizard = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "onboarding",
             Title = "Onboarding Wizard",
             Steps =
             [
-                new FormStepSchema
+                new DynamicStepSchema
                 {
                     Key = "step1", Title = "Account",
                     Fields =
                     [
-                        new FormFieldSchema { Key = "org", Label = "Org Name", DefaultValue = "InitialOrg", Required = true },
-                        new FormFieldSchema { Key = "newsletter", Label = "Newsletter", Kind = FormFieldKind.Checkbox, DefaultValue = false },
-                        new FormFieldSchema { Key = "hiddenNote", Label = "Hidden Note", Condition = f => f.GetValue<bool>("newsletter") }
+                        new DynamicFieldSchema { Key = "org", Label = "Org Name", DefaultValue = "InitialOrg", Required = true },
+                        new DynamicFieldSchema { Key = "newsletter", Label = "Newsletter", Kind = FormFieldKind.Checkbox, DefaultValue = false },
+                        new DynamicFieldSchema { Key = "hiddenNote", Label = "Hidden Note", Condition = f => f.GetValue<bool>("newsletter") }
                     ]
                 },
-                new FormStepSchema
+                new DynamicStepSchema
                 {
                     Key = "step2", Title = "Confirm",
-                    Fields = [new FormFieldSchema { Key = "accepted", Label = "Accepted", Kind = FormFieldKind.Checkbox, DefaultValue = true }]
+                    Fields = [new DynamicFieldSchema { Key = "accepted", Label = "Accepted", Kind = FormFieldKind.Checkbox, DefaultValue = true }]
                 }
             ]
         });
@@ -110,16 +110,11 @@ public sealed class AgentBridgeDeepTests
     public async Task AgentBridge_drives_SpreadsheetImporter_steps_and_submit()
     {
         var imported = 0;
-        var importer = new SpreadsheetImporter(new SpreadsheetSchema
+        var importer = new SpreadsheetImporter<PersonRow>(TestSheets.Names("contacts-import", required: true, onSubmit: rows =>
         {
-            Key = "contacts-import",
-            Columns = [new SpreadsheetColumnSchema { Key = "name", Label = "Name", Required = true }],
-            OnSubmit = rows =>
-            {
-                imported += rows.Count;
-                return Task.FromResult<IReadOnlyList<SpreadsheetRejectedRow>?>([]);
-            }
-        });
+            imported += rows.Count;
+            return Task.FromResult<IReadOnlyList<SpreadsheetRejectedRow>?>([]);
+        }));
         importer.LoadText("Name\nAlice\nBob", "contacts.csv");
 
         // submit is confirmation-required, which is refused unless a policy approves it.
@@ -143,11 +138,11 @@ public sealed class AgentBridgeDeepTests
     public async Task AgentBridge_halts_multi_step_ActAsync_on_error_respects_AllowPolicy_and_disposes_Observe()
     {
         var agent = new AgentBridgeService();
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "cfg",
             Title = "Config",
-            Fields = [new FormFieldSchema { Key = "a", Label = "Field A", DefaultValue = "1" }, new FormFieldSchema { Key = "b", Label = "Field B", DefaultValue = "2" }]
+            Fields = [new DynamicFieldSchema { Key = "a", Label = "Field A", DefaultValue = "1" }, new DynamicFieldSchema { Key = "b", Label = "Field B", DefaultValue = "2" }]
         });
         agent.RegisterForm(form, confirmSubmit: true);
 

@@ -7,21 +7,21 @@ public sealed class ToolDefinitionTests
 {
     private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
-    private static (AgentBridgeService Agent, FormController Form) Bridge()
+    private static (AgentBridgeService Agent, DynamicFormController Form) Bridge()
     {
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "order",
             Title = "Order",
             Fields =
             [
-                new FormFieldSchema { Key = "qty", Label = "Quantity", Kind = FormFieldKind.Number },
-                new FormFieldSchema
+                new DynamicFieldSchema { Key = "qty", Label = "Quantity", Kind = FormFieldKind.Number },
+                new DynamicFieldSchema
                 {
                     Key = "toppings", Label = "Toppings", Kind = FormFieldKind.CheckboxGroup,
                     Options = [new("cheese", "Cheese"), new("olives", "Olives")],
                 },
-                new FormFieldSchema { Key = "note", Label = "Note", Condition = f => f.GetValue<double>("qty") > 5 },
+                new DynamicFieldSchema { Key = "note", Label = "Note", Condition = f => f.GetValue<double>("qty") > 5 },
             ],
         });
         var agent = new AgentBridgeService();
@@ -109,32 +109,32 @@ public sealed class ToolDefinitionTests
     {
         var (agent, form) = Bridge();
 
-        var visible = Assert.IsAssignableFrom<IReadOnlyList<AgentComponentSnapshot>>(await agent.InvokeToolAsync("snapshot", Json("""{ "includeOffPage": false }""")));
+        var visible = Assert.IsType<AgentSnapshotResult>(await agent.InvokeToolAsync("snapshot", Json("""{ "includeOffPage": false }"""))).Components;
         Assert.DoesNotContain(visible, c => c.Label == "Note");
-        var all = Assert.IsAssignableFrom<IReadOnlyList<AgentComponentSnapshot>>(await agent.InvokeToolAsync("snapshot", default));
+        var all = Assert.IsType<AgentSnapshotResult>(await agent.InvokeToolAsync("snapshot", default)).Components;
         Assert.DoesNotContain(all, c => c.Label == "Note"); // its condition is false, so it is not in effect
         form.SetValue("qty", 9.0);
-        var after = Assert.IsAssignableFrom<IReadOnlyList<AgentComponentSnapshot>>(await agent.InvokeToolAsync("snapshot", default));
+        var after = Assert.IsType<AgentSnapshotResult>(await agent.InvokeToolAsync("snapshot", default)).Components;
         Assert.Contains(after, c => c.Label == "Note");
 
-        var choices = Assert.IsAssignableFrom<IReadOnlyList<AgentQueryMatch>>(await agent.InvokeToolAsync("query", Json("""{ "within": "Toppings", "text": "oliv" }""")));
+        var choices = Assert.IsType<AgentQueryResult>(await agent.InvokeToolAsync("query", Json("""{ "within": "Toppings", "text": "oliv" }"""))).Matches;
         Assert.Equal("olives", Assert.Single(Assert.Single(choices).Items).Value);
     }
 
     [Fact]
     public async Task InvokeTool_query_pages_a_collection()
     {
-        var importer = new SpreadsheetImporter(new SpreadsheetSchema { Key = "rows", Columns = [new SpreadsheetColumnSchema { Key = "a", Label = "A" }] });
+        var importer = new SpreadsheetImporter<PersonRow>(TestSheets.OneColumn("rows"));
         importer.LoadText("A\n1\n2\n3", "r.csv");
         var agent = new AgentBridgeService();
         agent.RegisterSpreadsheet(importer);
 
-        var result = Assert.IsAssignableFrom<IReadOnlyList<AgentQueryMatch>>(await agent.InvokeToolAsync("query",
-            Json("""{ "within": "rows", "collection": "rows", "limit": 2, "offset": 1 }""")));
+        var result = Assert.IsType<AgentQueryResult>(await agent.InvokeToolAsync("query",
+            Json("""{ "within": "rows", "collection": "rows", "limit": 2, "offset": 1 }"""))).Matches;
 
         var match = Assert.Single(result);
         Assert.Equal(3, match.Total);
-        Assert.Equal([3, 4], match.Records!.Select(r => (int)r["rowNumber"]!));
+        Assert.Equal([3, 4], match.Records!.Cast<AgentRowRecord>().Select(r => r.RowNumber));
     }
 
     [Theory]
@@ -162,7 +162,7 @@ public sealed class ToolDefinitionTests
     [Fact]
     public async Task InvokeTool_act_goes_through_the_policy_like_ActAsync()
     {
-        var form = new FormController(new FormSchema { FormKey = "pay", Title = "Payment", Fields = [new FormFieldSchema { Key = "a", Label = "A" }] });
+        var form = new DynamicFormController(new DynamicFormSchema { FormKey = "pay", Title = "Payment", Fields = [new DynamicFieldSchema { Key = "a", Label = "A" }] });
         var agent = new AgentBridgeService();
         agent.RegisterForm(form, confirmSubmit: true);
         var call = Json("""{ "steps": [ { "ref": "Payment", "action": "submit" } ] }""");
@@ -194,15 +194,15 @@ public sealed class ToolDefinitionTests
     [Fact]
     public async Task Limit_and_offset_written_as_25_0_are_whole_numbers()
     {
-        var importer = new SpreadsheetImporter(new SpreadsheetSchema { Key = "rows", Columns = [new SpreadsheetColumnSchema { Key = "a", Label = "A" }] });
+        var importer = new SpreadsheetImporter<PersonRow>(TestSheets.OneColumn("rows"));
         importer.LoadText("A\n1\n2\n3", "r.csv");
         var agent = new AgentBridgeService();
         agent.RegisterSpreadsheet(importer);
 
-        var result = Assert.IsAssignableFrom<IReadOnlyList<AgentQueryMatch>>(await agent.InvokeToolAsync("query",
-            Json("""{ "within": "rows", "collection": "rows", "limit": 2.0, "offset": 1.0 }""")));
+        var result = Assert.IsType<AgentQueryResult>(await agent.InvokeToolAsync("query",
+            Json("""{ "within": "rows", "collection": "rows", "limit": 2.0, "offset": 1.0 }"""))).Matches;
 
-        Assert.Equal([3, 4], Assert.Single(result).Records!.Select(r => (int)r["rowNumber"]!));
+        Assert.Equal([3, 4], Assert.Single(result).Records!.Cast<AgentRowRecord>().Select(r => r.RowNumber));
         Assert.IsType<AgentToolError>(await agent.InvokeToolAsync("query", Json("""{ "limit": 2.5 }""")));
     }
 

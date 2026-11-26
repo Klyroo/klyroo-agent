@@ -89,10 +89,10 @@ public sealed partial class AgentBridgeService
     /// <param name="arguments">The arguments object. An undefined or null value counts as an empty object.</param>
     /// <param name="allow">Passed to <see cref="ActAsync"/> for an <c>act</c> call.</param>
     /// <returns>
-    /// The list of <see cref="AgentComponentSnapshot"/> for <c>snapshot</c>, the list of <see cref="AgentQueryMatch"/> for
-    /// <c>query</c>, an <see cref="AgentActResult"/> for <c>act</c>, or an <see cref="AgentToolError"/>.
+    /// An <see cref="AgentSnapshotResult"/> for <c>snapshot</c>, an <see cref="AgentQueryResult"/> for <c>query</c>, an
+    /// <see cref="AgentActResult"/> for <c>act</c>, or an <see cref="AgentToolError"/>.
     /// </returns>
-    public async Task<object> InvokeToolAsync(string tool, JsonElement arguments, Func<AgentActStep, bool, Task<bool>>? allow = null)
+    public async Task<AgentToolResult> InvokeToolAsync(string tool, JsonElement arguments, Func<AgentActStep, bool, Task<bool>>? allow = null)
     {
         if (arguments.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
         {
@@ -107,10 +107,10 @@ public sealed partial class AgentBridgeService
         {
             case "snapshot":
                 if (!TryReadBool(arguments, "includeOffPage", true, out var includeOffPage, out var snapshotError)) return new AgentToolError(snapshotError!);
-                return Snapshot(includeOffPage);
+                return new AgentSnapshotResult(Snapshot(includeOffPage));
 
             case "query":
-                return TryParseQuery(arguments, out var request, out var queryError) ? Query(request) : new AgentToolError(queryError!);
+                return TryParseQuery(arguments, out var request, out var queryError) ? new AgentQueryResult(Query(request)) : new AgentToolError(queryError!);
 
             case "act":
                 return TryParseSteps(arguments, out var steps, out var actError) ? await ActAsync(steps, allow) : new AgentToolError(actError!);
@@ -181,13 +181,6 @@ public sealed partial class AgentBridgeService
         return true;
     }
 
-    private static bool ContainsObject(JsonElement element) => element.ValueKind switch
-    {
-        JsonValueKind.Object => true,
-        JsonValueKind.Array => element.EnumerateArray().Any(ContainsObject),
-        _ => false,
-    };
-
     private static bool TryParseSteps(JsonElement obj, out List<AgentActStep> steps, out string? error)
     {
         steps = [];
@@ -208,7 +201,7 @@ public sealed partial class AgentBridgeService
                 error = $"Step {index}: a step needs a \"ref\" and an \"action\" as text.";
                 return false;
             }
-            List<object?>? args = null;
+            List<AgentArgument>? args = null;
             if (item.TryGetProperty("args", out var argList) && argList.ValueKind != JsonValueKind.Null)
             {
                 if (argList.ValueKind != JsonValueKind.Array)
@@ -216,13 +209,13 @@ public sealed partial class AgentBridgeService
                     error = $"Step {index}: \"args\" must be a list.";
                     return false;
                 }
-                if (argList.EnumerateArray().Any(ContainsObject))
+                if (argList.EnumerateArray().Any(AgentArgs.ContainsObject))
                 {
                     error = $"Step {index}: an argument is an object; arguments are text, numbers, booleans, null or lists of those.";
                     return false;
                 }
-                // The raw elements are kept: ActAsync unwraps them, so a number stays a number and a list stays a list.
-                args = argList.EnumerateArray().Select(a => (object?)a.Clone()).ToList();
+                // The raw elements are kept, so a number stays a number with its digits and a list stays a list.
+                args = argList.EnumerateArray().Select(a => new AgentArgument(a)).ToList();
             }
             steps.Add(new AgentActStep(reference, action, args));
         }

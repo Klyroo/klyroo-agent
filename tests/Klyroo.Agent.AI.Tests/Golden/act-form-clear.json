@@ -1,0 +1,1 @@
+{"ok":true,"steps":[{"ref":"c1","action":"clear","ok":true},{"ref":"c3","action":"clear","ok":true,"value":false},{"ref":"c5","action":"clear","ok":true,"value":[]},{"ref":"c2","action":"setValue","ok":true,"value":3}],"values":{"c1":null,"c3":false,"c5":[],"c2":3}}

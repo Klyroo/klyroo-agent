@@ -11,7 +11,7 @@ public sealed class AgentAIFunctionTests
     private sealed class Setup
     {
         public required AgentBridgeService Bridge { get; init; }
-        public required FormController Form { get; init; }
+        public required DynamicFormController Form { get; init; }
         public int Submits;
     }
 
@@ -20,14 +20,14 @@ public sealed class AgentAIFunctionTests
         var setup = new Setup
         {
             Bridge = new AgentBridgeService(),
-            Form = new FormController(new FormSchema
+            Form = new DynamicFormController(new DynamicFormSchema
             {
                 FormKey = "refund",
                 Title = "Refund",
                 Fields =
                 [
-                    new FormFieldSchema { Key = "amount", Label = "Amount", Kind = FormFieldKind.Number },
-                    new FormFieldSchema
+                    new DynamicFieldSchema { Key = "amount", Label = "Amount", Kind = FormFieldKind.Number },
+                    new DynamicFieldSchema
                     {
                         Key = "reason", Label = "Reason", Kind = FormFieldKind.Select,
                         Options = [new("damaged", "Damaged"), new("late", "Late")],
@@ -43,14 +43,14 @@ public sealed class AgentAIFunctionTests
     private static Setup WithCountedSubmit(bool confirmSubmit = true)
     {
         Setup? setup = null;
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "refund",
             Title = "Refund",
             Fields =
             [
-                new FormFieldSchema { Key = "amount", Label = "Amount", Kind = FormFieldKind.Number },
-                new FormFieldSchema
+                new DynamicFieldSchema { Key = "amount", Label = "Amount", Kind = FormFieldKind.Number },
+                new DynamicFieldSchema
                 {
                     Key = "reason", Label = "Reason", Kind = FormFieldKind.Select,
                     Options = [new("damaged", "Damaged"), new("late", "Late")],

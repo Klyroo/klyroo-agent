@@ -7,6 +7,20 @@ namespace Klyroo.Agent.Tests;
 
 public sealed class BridgeActionRulesTests
 {
+    private sealed class CapturingLogger : Microsoft.Extensions.Logging.ILogger
+    {
+        public List<Exception> Exceptions { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (exception is not null) Exceptions.Add(exception);
+        }
+    }
+
     private static DashboardFilterControl AddRegions(DashboardController dashboard, int? max = null) =>
         dashboard.AddFilter(new DashboardFilterControl(
             "region", "Region",
@@ -18,31 +32,33 @@ public sealed class BridgeActionRulesTests
     [Fact]
     public async Task A_step_that_throws_fails_the_run_instead_of_throwing()
     {
-        var agent = new AgentBridgeService();
-        var form = new FormController(new FormSchema
+        var logger = new CapturingLogger();
+        var agent = new AgentBridgeService { Logger = logger };
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "f",
             Title = "Profile",
-            Fields = [new FormFieldSchema { Key = "name", Label = "Name" }],
-            OnSubmit = _ => throw new InvalidOperationException("database down"),
+            Fields = [new DynamicFieldSchema { Key = "name", Label = "Name" }],
+            OnSubmit = _ => throw new InvalidOperationException("database down at db.internal:5432"),
         });
         agent.RegisterForm(form, confirmSubmit: false);
 
         var result = await agent.ActAsync([new AgentActStep("Profile", "submit")]);
 
+        // The text of a host exception can hold a path or a connection string: the model reads a generic message, the host reads the log.
         Assert.False(result.Ok);
-        Assert.Contains("database down", result.Error);
+        Assert.Contains("failed", result.Error);
+        Assert.DoesNotContain("database down", result.Error);
+        Assert.DoesNotContain("db.internal", result.Error);
+        var logged = Assert.Single(logger.Exceptions);
+        Assert.Equal("database down at db.internal:5432", logged.Message);
     }
 
     [Fact]
     public async Task A_bad_spreadsheet_row_fails_the_step_and_a_good_one_reports_its_row()
     {
         var agent = new AgentBridgeService();
-        var importer = new SpreadsheetImporter(new SpreadsheetSchema
-        {
-            Key = "people",
-            Columns = [new SpreadsheetColumnSchema { Key = "name", Label = "Name" }],
-        });
+        var importer = new SpreadsheetImporter<PersonRow>(TestSheets.Names("people"));
         importer.LoadText("Name\nAda\nGrace", "people.csv");
         agent.RegisterSpreadsheet(importer);
         var observed = new List<ObservedChange>();
@@ -97,13 +113,13 @@ public sealed class BridgeActionRulesTests
     public async Task Hidden_fields_are_refused_and_disposing_a_registration_removes_it()
     {
         var agent = new AgentBridgeService();
-        var form = new FormController(new FormSchema
+        var form = new DynamicFormController(new DynamicFormSchema
         {
             FormKey = "f",
             Fields =
             [
-                new FormFieldSchema { Key = "company", Label = "Company", Condition = _ => false },
-                new FormFieldSchema { Key = "name", Label = "Name" },
+                new DynamicFieldSchema { Key = "company", Label = "Company", Condition = _ => false },
+                new DynamicFieldSchema { Key = "name", Label = "Name" },
             ],
         });
         var registration = agent.RegisterForm(form);

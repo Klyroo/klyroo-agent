@@ -1,0 +1,1 @@
+[{"ref":"c13","component":"spreadsheet","label":"people","items":[],"more":0,"records":[{"rowNumber":3,"status":"blocking","importable":false,"discardReason":null,"edited":false,"cells":{"name":"Grace","age":"abc","team":"Engine","id":""},"issues":[{"field":"age","code":"number","level":"error","message":"\u0022abc\u0022 is not a number"}]}],"total":2,"offset":0}]
