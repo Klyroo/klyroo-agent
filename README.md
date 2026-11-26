@@ -29,7 +29,6 @@ in a console app.
 | [`Klyroo.Agent.Core`](https://www.nuget.org/packages/Klyroo.Agent.Core) | The data types of the bridge (`AgentActStep`, `AgentActResult`, `ObservedChange`, ...) and `UndoStack<T>`. No dependencies, NativeAOT compatible. |
 | [`Klyroo.Agent`](https://www.nuget.org/packages/Klyroo.Agent) | `AgentBridgeService`, `AddKlyrooAgent()`, and the browser runtime served from `_content/Klyroo.Agent/`. Depends on `Klyroo.Agent.Core`, `Klyroo.Form.Core`, `Klyroo.Dashboard.Core` and `Klyroo.Spreadsheet.Core`. |
 | [`@klyroo/agent`](packages/agent/README.md) | Source of the browser runtime (npm package manifest). Not published to npm; the same file ships inside `Klyroo.Agent`. |
-| [`@klyroo/behaviors`](packages/behaviors/README.md) | Source of a set of headless UI behaviors (focus, selection, popup, undo). Not published to npm; the same file ships inside `Klyroo.Agent`. |
 
 ## Installation
 

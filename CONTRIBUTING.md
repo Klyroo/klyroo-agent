@@ -7,7 +7,7 @@ tests, versions and releases, so a change usually belongs to exactly one of them
 ## Prerequisites
 
 - **.NET SDK 10** (`global.json` pins the feature band and rolls forward). Install from [dot.net](https://dot.net).
-- **Node.js** is optional. The JavaScript assets under `src/Klyroo.Agent/wwwroot` are plain ES modules that are edited by hand and must stay identical to `packages/agent/index.js` and `packages/behaviors/index.js`.
+- **Node.js** is optional. The JavaScript assets under `src/Klyroo.Agent/wwwroot` are plain ES modules that are edited by hand and must stay identical to `packages/agent/index.js`.
 - Some projects reference sibling Klyroo repositories by relative path (`../klyroo-form`, ...). Clone the
   repositories you need next to each other:
 

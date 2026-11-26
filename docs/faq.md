@@ -56,11 +56,6 @@ user edits.
 Static web assets are served automatically in development. In a published app, map them with `MapStaticAssets` or
 `UseStaticFiles`.
 
-**`import` of `klyroo-behaviors.js` fails**
-
-`klyroo-behaviors.js` imports `./shared.js`, which this package does not contain. The module cannot be loaded on its
-own until that file is provided. `klyroo-agent.js` has no imports and is not affected.
-
 ## Known limitations
 
 - `ActAsync` has no rollback: a failing step leaves earlier steps applied.
@@ -72,7 +67,7 @@ own until that file is provided. `klyroo-agent.js` has no imports and is not aff
 - `AgentChangeSource` has seven values, but the .NET bridge only ever reports `Agent`.
 - The service is not thread safe.
 - The browser runtime and `AgentBridgeService` are independent: references (`c1`) from one are not valid in the other.
-- `@klyroo/agent` and `@klyroo/behaviors` are not published to npm.
+- `@klyroo/agent` is not published to npm.
 
 ## Questions
 

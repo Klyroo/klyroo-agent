@@ -101,8 +101,9 @@ most 100 elements and `query` at most 50 matches. Elements marked `data-agent-co
 
 `registerWebMcp` publishes `snapshot`, `query` and `act` to the browser's `modelContext` (WebMCP) when
 `document.modelContext` or `navigator.modelContext` exposes `registerTool`, and returns a function that
-unregisters them. The `@klyroo/behaviors` module is a separate set of headless UI helpers; see its
-[README](../packages/behaviors/README.md).
+unregisters them. To give a custom widget an agent API, define it with `Klyroo.definePrimitive` from the Klyroo.UI
+script, which also exposes the headless helpers (focus, selection, popup, reorder, undo) as `Klyroo.behaviors`. The
+runtime finds the result through its `data-kly-primitive` attribute.
 
 ## Design decisions
 

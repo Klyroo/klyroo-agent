@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Removed
+
+- `klyroo-behaviors.js` and the `@klyroo/behaviors` source. The module imported a `./shared.js` that was never shipped, so it could not load. The same helpers are in the Klyroo.UI script as `Klyroo.behaviors` and `Klyroo.definePrimitive`.
+
 ### Fixed
 
 - An exception thrown by an `Observe` callback escaped `ActAsync` after the step was applied, ending the run and skipping the other subscribers. It is now ignored.
@@ -22,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `Observe` change stream delivering an `ObservedChange` for each successful step, and `GetToolDefinitions` describing the `snapshot`, `query` and `act` tools with read-only and consequential hints.
 - `AddKlyrooAgent()` dependency injection registration (scoped).
 - `UndoStack<T>`, a bounded undo and redo history, in the dependency-free, NativeAOT-compatible `Klyroo.Agent.Core` package.
-- Browser runtime `klyroo-agent.js` (snapshot, query, act, observe and WebMCP registration) and the `klyroo-behaviors.js` helper module, shipped as static web assets of `Klyroo.Agent`.
+- Browser runtime `klyroo-agent.js` (snapshot, query, act, observe and WebMCP registration) shipped as a static web asset of `Klyroo.Agent`.
 
 [Unreleased]: https://github.com/klyroo/klyroo-agent/compare/v0.1.0-preview.1...HEAD
 [0.1.0-preview.1]: https://github.com/klyroo/klyroo-agent/releases/tag/v0.1.0-preview.1
