@@ -7,12 +7,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `RegisterForm`, `RegisterDashboard` and `RegisterSpreadsheet` return a handle that removes the registered components when disposed.
+- `ObservedChange.Row` holds the row index of a spreadsheet `editCell` step.
+- A dashboard filter `setValue` accepts a list of values for a multiple filter.
+
 ### Removed
 
 - `klyroo-behaviors.js` and the `@klyroo/behaviors` source. The module imported a `./shared.js` that was never shipped, so it could not load. The same helpers are in the Klyroo.UI script as `Klyroo.behaviors` and `Klyroo.definePrimitive`.
 
 ### Fixed
 
+- A step whose action throws, such as a failing `OnSubmit` or a non-numeric `editCell` row, now fails the run with an `Error` instead of throwing out of `ActAsync`.
+- A dashboard filter `setValue` toggled the value, so setting a selected value removed it, and `clear` restored the defaults. `setValue` now sets the selection, `clear` empties it (multiple filters only), and an unknown value or a selection over `Max` fails the step instead of reporting success.
+- Steps on a component that is not displayed, such as a hidden conditional field, are refused.
 - An exception thrown by an `Observe` callback escaped `ActAsync` after the step was applied, ending the run and skipping the other subscribers. It is now ignored.
 
 ## [0.1.0-preview.1] - 2026-11-24

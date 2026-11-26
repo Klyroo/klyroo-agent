@@ -47,7 +47,7 @@ var result = await agent.ActAsync(
 Goal: let an agent fill a stepped form and move between its steps.
 
 A form built from `Steps` exposes `nextStep` and `previousStep` on the form component. Fields of the current and
-other steps are all registered; fields whose `Condition` is false are marked `OffPage`.
+other steps are all registered; fields whose `Condition` is false are marked `OffPage` and refuse every step.
 
 ```csharp
 var wizard = new FormController(new FormSchema
@@ -113,8 +113,10 @@ await agent.ActAsync(
 ]);
 ```
 
-On a filter, `setValue` and `toggle` both call the filter's `Toggle(value)`. For a single-select filter that
-replaces the selection; for a multiple-select filter it adds or removes the value. The dashboard is addressed by
+On a filter, `setValue` replaces the selection: with one value, or with every value of a list
+(`["emea", "amer"]`) on a multiple filter. A multiple filter also accepts `toggle`, which adds or removes one value,
+and `clear`, which empties the selection; `reset` restores the defaults. A value that is not an option, or a
+selection larger than the filter's `Max`, fails the step without changing anything. The dashboard is addressed by
 its key (`revenue`), not by a title.
 
 ## Import a spreadsheet through the agent

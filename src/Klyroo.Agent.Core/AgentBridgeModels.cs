@@ -36,7 +36,7 @@ public enum AgentChangeSource
 /// <param name="Value">The value after the step ran.</param>
 /// <param name="Reason">The action name that caused the change, for example <c>setValue</c>.</param>
 /// <param name="Source">What caused the change.</param>
-/// <param name="Row">An optional row identifier for tabular components. The bridge does not set it.</param>
+/// <param name="Row">The row a step addressed on a tabular component: the 0-based row index of a spreadsheet <c>editCell</c> step, otherwise <see langword="null"/>.</param>
 public sealed record ObservedChange(
     string Component,
     string Ref,

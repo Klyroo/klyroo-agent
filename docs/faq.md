@@ -6,8 +6,8 @@
 
 Two registered components share a label. The usual cause is registering the same controller twice, for example a
 component that calls `RegisterForm` on every initialization while the scoped service lives across navigations. The
-bridge cannot unregister a controller, so register once per service lifetime, or give the second form different
-labels, or address components by reference (`c3`) taken from a fresh `Snapshot`.
+register methods return a handle: dispose it when the component goes away, so the next
+registration does not duplicate the labels, or address components by reference (`c3`) taken from a fresh `Snapshot`.
 
 **A step fails with `component "..." not found`**
 
@@ -63,7 +63,6 @@ Static web assets are served automatically in development. In a published app, m
   by field kind.
 - Only Klyroo.Form, Klyroo.Dashboard and Klyroo.Spreadsheet controllers can be registered. Any other source of state
   needs its own adapter in your code.
-- There is no way to unregister a controller; the service keeps it alive until the scope ends.
 - `AgentChangeSource` has seven values, but the .NET bridge only ever reports `Agent`.
 - The service is not thread safe.
 - The browser runtime and `AgentBridgeService` are independent: references (`c1`) from one are not valid in the other.

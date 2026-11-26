@@ -29,6 +29,25 @@ public sealed class AgentBridgeService
         public Func<bool>? IsOffPage { get; init; }
         public bool Sensitive { get; init; }
         public bool ConfirmRequired { get; init; }
+        /// <summary>The row an action step addresses, for tabular components; reported as <see cref="ObservedChange.Row"/>.</summary>
+        public Func<string, IReadOnlyList<object?>, string?>? RowOf { get; init; }
+    }
+
+    /// <summary>Removes the components added by one Register call.</summary>
+    private sealed class Registration(List<BoundTarget> owner, List<BoundTarget> added) : IDisposable
+    {
+        public void Dispose()
+        {
+            foreach (var target in added) owner.Remove(target);
+            added.Clear();
+        }
+    }
+
+    // Adds the components of one Register call and returns the handle that removes them.
+    private IDisposable AddTargets(List<BoundTarget> targets)
+    {
+        _targets.AddRange(targets);
+        return new Registration(_targets, targets);
     }
 
     /// <summary>Creates an empty bridge with no registered components and no <see cref="AllowPolicy"/>.</summary>
@@ -82,10 +101,12 @@ public sealed class AgentBridgeService
     /// Marks the form component as confirmation-required, which is passed to <see cref="AllowPolicy"/> for every
     /// action on the form (<c>submit</c>, <c>reset</c> and step navigation).
     /// </param>
+    /// <returns>A handle that removes the form's components when disposed, for example when the form closes.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="form"/> is <see langword="null"/>.</exception>
-    public void RegisterForm(FormController form, bool confirmSubmit = false)
+    public IDisposable RegisterForm(FormController form, bool confirmSubmit = false)
     {
         ArgumentNullException.ThrowIfNull(form);
+        var added = new List<BoundTarget>();
         foreach (var field in form.AllFields)
         {
             if (FormController.IsStateless(field.Kind)) continue;
@@ -105,7 +126,7 @@ public sealed class AgentBridgeService
                 _ => new[] { "setValue", "clear", "reset" },
             };
 
-            _targets.Add(new BoundTarget
+            added.Add(new BoundTarget
             {
                 Ref = fieldRef,
                 Component = componentKind,
@@ -147,7 +168,7 @@ public sealed class AgentBridgeService
         }
 
         // Also register the form root for submit / reset / nextStep / previousStep
-        _targets.Add(new BoundTarget
+        added.Add(new BoundTarget
         {
             Ref = NextRef(),
             Component = "form",
@@ -174,53 +195,49 @@ public sealed class AgentBridgeService
                 }
             },
         });
+        return AddTargets(added);
     }
 
     /// <summary>
     /// Registers a dashboard. Each non-headless filter becomes a <c>select</c> component, and the dashboard itself
-    /// accepts <c>setView</c>, <c>resetFilters</c> and <c>refresh</c>.
+    /// accepts <c>setView</c>, <c>resetFilters</c> and <c>refresh</c>. On a filter, <c>setValue</c> replaces the
+    /// selection with the given value, or with every value of a list for a multiple filter; <c>toggle</c> adds or
+    /// removes one value of a multiple filter; <c>clear</c> (multiple filters only) empties the selection; and
+    /// <c>reset</c> restores the default values. A value that is not one of the filter's options fails the step.
     /// </summary>
     /// <param name="dashboard">The dashboard to expose.</param>
+    /// <returns>A handle that removes the dashboard's components when disposed.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="dashboard"/> is <see langword="null"/>.</exception>
-    public void RegisterDashboard(DashboardController dashboard)
+    public IDisposable RegisterDashboard(DashboardController dashboard)
     {
         ArgumentNullException.ThrowIfNull(dashboard);
+        var added = new List<BoundTarget>();
         foreach (var filter in dashboard.Controls)
         {
             if (filter.Headless) continue;
-            _targets.Add(new BoundTarget
+            added.Add(new BoundTarget
             {
                 Ref = NextRef(),
                 Component = "select",
                 Label = filter.Label,
                 IsDisabled = () => !filter.Enabled,
                 GetValue = () => filter.Multiple ? filter.Values : filter.Value,
-                Actions = ["setValue", "toggle", "clear", "reset"],
+                Actions = filter.Multiple ? ["setValue", "toggle", "clear", "reset"] : ["setValue", "reset"],
                 GetChoices = () => filter.Items
                     .Select(i => new AgentChoiceItem(i.Value, i.Label, filter.IsSelected(i.Value), i.Disabled))
                     .ToList(),
-                ExecuteAction = (action, args) =>
+                ExecuteAction = (action, args) => Task.FromResult(action switch
                 {
-                    switch (action)
-                    {
-                        case "setValue":
-                        case "toggle":
-                            var val = args.Count > 0 ? args[0]?.ToString() : null;
-                            if (val is null) return Task.FromResult(false);
-                            filter.Toggle(val);
-                            return Task.FromResult(true);
-                        case "clear":
-                        case "reset":
-                            filter.Reset();
-                            return Task.FromResult(true);
-                        default:
-                            return Task.FromResult(false);
-                    }
-                },
+                    "setValue" => SetFilterSelection(filter, args.Count > 0 ? args[0] : null),
+                    "toggle" => ToggleFilterValue(filter, args.Count > 0 ? args[0]?.ToString() : null),
+                    "clear" => SetFilterValues(filter, []),
+                    "reset" => ResetFilter(filter),
+                    _ => false,
+                }),
             });
         }
 
-        _targets.Add(new BoundTarget
+        added.Add(new BoundTarget
         {
             Ref = NextRef(),
             Component = "dashboard",
@@ -249,6 +266,64 @@ public sealed class AgentBridgeService
                 }
             },
         });
+        return AddTargets(added);
+    }
+
+    private static bool ResetFilter(DashboardFilterControl filter)
+    {
+        filter.Reset();
+        return true;
+    }
+
+    private static bool IsOption(DashboardFilterControl filter, string value) =>
+        filter.Items.Any(i => string.Equals(i.Value, value, StringComparison.Ordinal) && !i.Disabled);
+
+    // setValue: a string replaces the selection with that value; a list (multiple filters) replaces it with the list.
+    private static bool SetFilterSelection(DashboardFilterControl filter, object? arg)
+    {
+        IReadOnlyList<string> wanted = arg switch
+        {
+            null => [],
+            string text => [text],
+            System.Collections.IEnumerable list => list.Cast<object?>().Select(v => v?.ToString() ?? "").ToList(),
+            _ => [arg.ToString() ?? ""],
+        };
+        if (wanted.Count == 0) return false;
+        if (!filter.Multiple)
+        {
+            if (wanted.Count != 1 || !IsOption(filter, wanted[0])) return false;
+            filter.Value = wanted[0];
+            return string.Equals(filter.Value, wanted[0], StringComparison.Ordinal);
+        }
+        return SetFilterValues(filter, wanted);
+    }
+
+    // Brings a multiple filter to exactly `wanted`, through Toggle so the filter's own rules apply. Fails without
+    // changing anything when a value is unknown or the list exceeds Max.
+    private static bool SetFilterValues(DashboardFilterControl filter, IReadOnlyList<string> wanted)
+    {
+        if (!filter.Enabled || !filter.Multiple) return false;
+        var distinct = wanted.Distinct(StringComparer.Ordinal).ToList();
+        if (distinct.Any(v => !IsOption(filter, v))) return false;
+        if (filter.Max is { } max && distinct.Count > max) return false;
+        foreach (var value in filter.Values.Where(v => !distinct.Contains(v, StringComparer.Ordinal)).ToList())
+        {
+            filter.Toggle(value);
+        }
+        foreach (var value in distinct.Where(v => !filter.IsSelected(v)))
+        {
+            filter.Toggle(value);
+        }
+        return filter.Values.Count == distinct.Count && distinct.All(filter.IsSelected);
+    }
+
+    // toggle: adds or removes one value of a multiple filter. Fails when the value is unknown or Max blocks the add.
+    private static bool ToggleFilterValue(DashboardFilterControl filter, string? value)
+    {
+        if (value is null || !filter.Multiple || !IsOption(filter, value)) return false;
+        var wasSelected = filter.IsSelected(value);
+        filter.Toggle(value);
+        return filter.IsSelected(value) != wasSelected;
     }
 
     /// <summary>
@@ -256,11 +331,12 @@ public sealed class AgentBridgeService
     /// <c>previousStep</c>, <c>submit</c> and <c>clearFile</c>. Loading the file itself is not an agent action.
     /// </summary>
     /// <param name="importer">The importer to expose.</param>
+    /// <returns>A handle that removes the importer's component when disposed.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="importer"/> is <see langword="null"/>.</exception>
-    public void RegisterSpreadsheet(SpreadsheetImporter importer)
+    public IDisposable RegisterSpreadsheet(SpreadsheetImporter importer)
     {
         ArgumentNullException.ThrowIfNull(importer);
-        _targets.Add(new BoundTarget
+        return AddTargets([new BoundTarget
         {
             Ref = NextRef(),
             Component = "spreadsheet",
@@ -268,14 +344,17 @@ public sealed class AgentBridgeService
             GetValue = () => importer.CurrentStepKey,
             Actions = ["editCell", "nextStep", "previousStep", "submit", "clearFile"],
             GetChoices = () => [],
+            RowOf = (action, args) => action == "editCell" && args.Count > 0 ? args[0]?.ToString() : null,
             ExecuteAction = async (action, args) =>
             {
                 switch (action)
                 {
                     case "editCell":
                         if (args.Count < 3) return false;
-                        var rIdx = Convert.ToInt32(args[0], CultureInfo.InvariantCulture);
+                        if (!int.TryParse(args[0]?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var rIdx)
+                            || rIdx < 0 || rIdx >= importer.AllRows.Count) return false;
                         var fKey = args[1]?.ToString() ?? "";
+                        if (!importer.Schema.Columns.Any(c => string.Equals(c.Key, fKey, StringComparison.Ordinal))) return false;
                         var text = args[2]?.ToString() ?? "";
                         importer.EditCell(rIdx, fKey, text);
                         return true;
@@ -293,7 +372,7 @@ public sealed class AgentBridgeService
                         return false;
                 }
             },
-        });
+        }]);
     }
 
     /// <summary>Lists the registered components in registration order, with their current value and available actions. At most 100 are returned.</summary>
@@ -382,10 +461,12 @@ public sealed class AgentBridgeService
 
     /// <summary>
     /// Runs the steps in order. A step is resolved by reference or by label (case and accent insensitive), then
-    /// checked for existence, ambiguity, disabled state and supported action, then passed to <see cref="AllowPolicy"/>
-    /// and <paramref name="allow"/>. The first failing step stops the run; steps that already ran are not rolled
-    /// back. Each successful step raises one <see cref="ObservedChange"/>. Failures are reported in
-    /// <see cref="AgentActResult.Error"/> rather than thrown.
+    /// checked for existence, ambiguity, disabled state, visibility (a component that is not displayed, such as a
+    /// conditional field whose condition is false, is refused) and supported action, then passed to
+    /// <see cref="AllowPolicy"/> and <paramref name="allow"/>. The first failing step stops the run; steps that
+    /// already ran are not rolled back. Each successful step raises one <see cref="ObservedChange"/>. Failures,
+    /// including an exception thrown while the action runs, are reported in <see cref="AgentActResult.Error"/>
+    /// rather than thrown.
     /// </summary>
     /// <param name="steps">The steps to run.</param>
     /// <param name="allow">An extra gate for this call only, called after <see cref="AllowPolicy"/> with the same arguments.</param>
@@ -422,6 +503,10 @@ public sealed class AgentBridgeService
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: component \"{target.Label}\" ({target.Ref}) is disabled.");
             }
+            if (target.IsOffPage?.Invoke() == true)
+            {
+                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: component \"{target.Label}\" ({target.Ref}) is not displayed right now.");
+            }
             if (!target.Actions.Contains(step.Action, StringComparer.Ordinal))
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" is not supported by \"{target.Label}\" ({target.Ref}).");
@@ -437,7 +522,17 @@ public sealed class AgentBridgeService
             }
 
             var previousValue = target.Sensitive ? RedactedValue : target.GetValue();
-            var ok = await target.ExecuteAction(step.Action, step.Args ?? []);
+            bool ok;
+            try
+            {
+                ok = await target.ExecuteAction(step.Action, step.Args ?? []);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Failures are values: a step that throws (a controller hook, a bad argument) fails the run.
+                values[target.Ref] = target.Sensitive ? RedactedValue : target.GetValue();
+                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" failed: {ex.Message}");
+            }
             var currentValue = target.Sensitive ? RedactedValue : target.GetValue();
             values[target.Ref] = currentValue;
 
@@ -455,7 +550,8 @@ public sealed class AgentBridgeService
                 previousValue,
                 currentValue,
                 step.Action,
-                AgentChangeSource.Agent));
+                AgentChangeSource.Agent,
+                target.RowOf?.Invoke(step.Action, step.Args ?? [])));
         }
 
         return new AgentActResult(true, outcomes, values);

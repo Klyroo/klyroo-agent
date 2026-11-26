@@ -24,7 +24,7 @@ gets and which actions it offers:
 | :--- | :--- | :--- |
 | Form field | `select` (Select, AutoComplete, Radio), `checkbox` (Checkbox, Switch), `number` (Number, Slider), otherwise `input` | `setValue`, `clear`, `reset`; checkboxes offer `toggle`, `setValue`, `reset` instead (no `clear`) |
 | The form | `form` | `submit`, `reset`; stepped forms also `nextStep`, `previousStep` |
-| Dashboard filter | `select` | `setValue`, `toggle`, `clear`, `reset` |
+| Dashboard filter | `select` | `setValue`, `reset`; multiple filters also `toggle`, `clear` |
 | The dashboard | `dashboard` | `setView`, `resetFilters`, `refresh` |
 | Spreadsheet importer | `spreadsheet` | `editCell`, `nextStep`, `previousStep`, `submit`, `clearFile` |
 
@@ -47,8 +47,10 @@ first check that fails:
 6. **Report it.** The new value is stored in `AgentActResult.Values`, the step is added to `Steps`, and one
    `ObservedChange` is delivered to subscribers.
 
+A component that is not displayed (a conditional field whose condition is false) refuses every step.
+
 Failures are values, not exceptions: you get `Ok = false` and an `Error` message that names the step number, the
-component and the reason. That makes the message safe to return to a language model as a tool result so it can
+component and the reason, including when the action throws (a failing `OnSubmit`, for example). That makes the message safe to return to a language model as a tool result so it can
 correct itself. There is no rollback. If step 3 of 5 fails, steps 1 and 2 stay applied and 4 and 5 never run.
 
 ## Confirmation and policy
@@ -81,8 +83,8 @@ interop; the Blazor-specific part is only the static web asset delivery of the b
 ## Lifetime and threading
 
 `AddKlyrooAgent()` registers the service as scoped, matching the lifetime of the controllers you register. The
-service keeps a reference to every controller it is given and has no unregister method, so its lifetime bounds how
-long those controllers stay alive. It is not thread safe: calls to `ActAsync`, the register methods and `Observe`
+service keeps a reference to every controller it is given until you dispose the handle the register method returned,
+or until the scope ends. It is not thread safe: calls to `ActAsync`, the register methods and `Observe`
 must not overlap. In Blazor Server, call it from code that already runs on the circuit, or wrap the call in `InvokeAsync`.
 
 ## The browser runtime
