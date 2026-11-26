@@ -88,15 +88,6 @@ public sealed partial class AgentBridgeService
     /// </remarks>
     public Func<AgentActStep, bool, Task<bool>>? AllowPolicy { get; set; }
 
-    /// <summary>Returns the definitions of the three agent tools, <c>snapshot</c>, <c>query</c> and <c>act</c>, for registration with an LLM or MCP host.</summary>
-    /// <returns>Three <see cref="AgentToolDefinition"/> values.</returns>
-    public static IReadOnlyList<AgentToolDefinition> GetToolDefinitions() =>
-    [
-        new("snapshot", "Lists the components on the page, their current state, and available actions.", ReadOnlyHint: true, ConsequentialHint: false, UntrustedContentHint: true),
-        new("query", "Finds components by label or kind, and lists choices inside a select or filter without opening popups.", ReadOnlyHint: true, ConsequentialHint: false, UntrustedContentHint: true),
-        new("act", "Calls semantic actions on components by ref or label (e.g. setValue, clear, toggle, reset, submit).", ReadOnlyHint: false, ConsequentialHint: true, UntrustedContentHint: true),
-    ];
-
     /// <summary>
     /// Subscribes to the changes made through <see cref="ActAsync"/>. The callback runs synchronously after each
     /// successful step. Changes a user makes directly in the UI are not reported. An exception thrown by the callback

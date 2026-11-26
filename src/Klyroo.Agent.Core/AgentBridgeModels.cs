@@ -220,12 +220,22 @@ public sealed record AgentActResult(
 /// <param name="ReadOnlyHint">Whether the tool never changes state.</param>
 /// <param name="ConsequentialHint">Whether the tool can have effects that are hard to undo.</param>
 /// <param name="UntrustedContentHint">Whether the tool result contains text that comes from the UI and must not be treated as instructions.</param>
+/// <param name="InputSchema">The JSON Schema of the tool arguments, an object schema with the same shape as the <c>inputSchema</c> of the tools in <c>klyroo-agent.js</c>, ready to hand to an LLM or MCP host.</param>
 public sealed record AgentToolDefinition(
     string Name,
     string Description,
     bool ReadOnlyHint,
     bool ConsequentialHint,
-    bool UntrustedContentHint);
+    bool UntrustedContentHint,
+    System.Text.Json.JsonElement InputSchema);
+
+/// <summary>
+/// The result of a tool call that could not run, for example because the arguments were malformed or the tool is
+/// unknown. Returned by <c>AgentBridgeService.InvokeToolAsync</c> instead of an exception, so the model can read
+/// the message and correct the call.
+/// </summary>
+/// <param name="Error">What was wrong with the call.</param>
+public sealed record AgentToolError(string Error);
 
 /// <summary>
 /// A bounded undo and redo history of immutable snapshots. It is independent of the agent bridge: use it for any
