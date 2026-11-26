@@ -292,4 +292,51 @@ public sealed class AgentAIFunctionTests
             await Function(functions, "act").Run(Args("""{ "steps": [ { "ref": "Amount", "action": "setValue", "args": [1] } ] }"""), cts.Token));
         Assert.Null(setup.Form.GetValue("amount"));
     }
+
+    [Fact]
+    public async Task In_approval_mode_act_refuses_a_confirmation_step_before_AllowPolicy_is_asked()
+    {
+        var setup = WithCountedSubmit();
+        var asked = new List<string>();
+        setup.Bridge.AllowPolicy = (step, _) =>
+        {
+            asked.Add(step.Action);
+            return Task.FromResult(true);
+        };
+        var functions = setup.Bridge.AsAIFunctions();
+
+        var result = AsJson(await Function(functions, "act").Run(Args("""
+            { "steps": [
+                { "ref": "Amount", "action": "setValue", "args": [10] },
+                { "ref": "Refund", "action": "submit" }
+            ] }
+            """)));
+
+        Assert.False(result.GetProperty("ok").GetBoolean());
+        Assert.Contains("act_with_approval", result.GetProperty("error").GetString());
+        // The user-facing policy saw the harmless step only: it was never prompted for the step that act refuses.
+        Assert.Equal(["setValue"], asked);
+        Assert.Equal(0, setup.Submits);
+
+        // After the host approves the call, the policy is asked for the step and still decides.
+        asked.Clear();
+        var approved = AsJson(await Function(functions, "act_with_approval").Run(Args("""{ "steps": [ { "ref": "Refund", "action": "submit" } ] }""")));
+        Assert.True(approved.GetProperty("ok").GetBoolean(), approved.GetRawText());
+        Assert.Equal(["submit"], asked);
+        Assert.Equal(1, setup.Submits);
+    }
+
+    [Fact]
+    public async Task A_confirmation_target_addressed_by_ref_is_refused_by_act_too()
+    {
+        var setup = WithCountedSubmit();
+        var formRef = setup.Bridge.Snapshot().Single(c => c.Component == "form").Ref;
+        var functions = setup.Bridge.AsAIFunctions();
+
+        var result = AsJson(await Function(functions, "act").Run(Args($$"""{ "steps": [ { "ref": "{{formRef}}", "action": "submit" } ] }""")));
+
+        Assert.False(result.GetProperty("ok").GetBoolean());
+        Assert.Contains("act_with_approval", result.GetProperty("error").GetString());
+        Assert.Equal(0, setup.Submits);
+    }
 }

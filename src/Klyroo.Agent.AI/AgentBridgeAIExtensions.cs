@@ -11,7 +11,7 @@ public static class AgentBridgeAIExtensions
     public const string ActWithApprovalName = "act_with_approval";
 
     private const string ActWithApprovalDescription =
-        "Same as act, for actions that need confirmation, such as submitting a form or an import. The user is asked to approve the call before it runs.";
+        "Same as act, for the steps act refused because they need confirmation: submitting a form (forms are confirmation-required by default), submitting or clearing a spreadsheet import, or any component the app flagged. The user is asked to approve the whole call before it runs, so send only the steps that need it.";
 
     /// <summary>
     /// Returns the <c>snapshot</c>, <c>query</c> and <c>act</c> tools of the bridge as <see cref="AIFunction"/> instances, with

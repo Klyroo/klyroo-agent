@@ -340,7 +340,7 @@ public sealed partial class AgentBridgeService
     /// rather than thrown.
     /// </summary>
     /// <param name="steps">The steps to run.</param>
-    /// <param name="allow">An extra gate for this call only, called after <see cref="AllowPolicy"/> with the same arguments. It also counts as a policy for steps that need confirmation.</param>
+    /// <param name="allow">An extra gate for this call only, called with the same arguments before <see cref="AllowPolicy"/>, so a refusal here never prompts whoever <see cref="AllowPolicy"/> asks. It also counts as a policy for steps that need confirmation.</param>
     /// <returns>The outcome of the run.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="steps"/> is <see langword="null"/>.</exception>
     public async Task<AgentActResult> ActAsync(
@@ -388,13 +388,15 @@ public sealed partial class AgentBridgeService
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" needs confirmation and no AllowPolicy is set.");
             }
-            if (AllowPolicy is not null && !await AllowPolicy(step, needsConfirmation))
-            {
-                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was refused by policy.");
-            }
+            // The per-call gate runs first: it is the cheap veto of the host (act refuses confirmation steps there), and
+            // AllowPolicy may ask a person, who must not be asked about a step that is going to be refused anyway.
             if (allow is not null && !await allow(step, needsConfirmation))
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was refused by caller policy.");
+            }
+            if (AllowPolicy is not null && !await AllowPolicy(step, needsConfirmation))
+            {
+                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was refused by policy.");
             }
 
             var stepArgs = new List<object?>();

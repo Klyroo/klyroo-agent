@@ -131,4 +131,66 @@ public sealed class ConfirmationPolicyTests
         Assert.False(field.ConfirmRequired);
         Assert.Empty(field.ConfirmActions!);
     }
+
+    [Fact]
+    public async Task A_confirmation_target_addressed_by_its_ref_is_gated_like_one_addressed_by_label()
+    {
+        var (agent, _, submits) = ConfirmedForm();
+        var formRef = agent.Snapshot().Single(c => c.Component == "form").Ref;
+
+        var refused = await agent.ActAsync([new AgentActStep(formRef, "submit")]);
+        Assert.False(refused.Ok);
+        Assert.Contains("needs confirmation", refused.Error);
+        Assert.Equal(0, submits[0]);
+
+        agent.AllowPolicy = (_, confirm) => Task.FromResult(confirm);
+        var approved = await agent.ActAsync([new AgentActStep(formRef, "submit")]);
+        Assert.True(approved.Ok, approved.Error);
+        Assert.Equal(1, submits[0]);
+    }
+
+    [Fact]
+    public async Task The_per_call_gate_runs_before_AllowPolicy_so_a_refused_step_never_prompts()
+    {
+        var (agent, _, submits) = ConfirmedForm();
+        var prompted = new List<string>();
+        agent.AllowPolicy = (step, _) =>
+        {
+            prompted.Add(step.Action);
+            return Task.FromResult(true);
+        };
+
+        var result = await agent.ActAsync(
+            [new AgentActStep("Amount", "setValue", [3]), new AgentActStep("Payment", "submit")],
+            (_, confirm) => Task.FromResult(!confirm));
+
+        Assert.False(result.Ok);
+        Assert.Contains("refused by caller policy", result.Error);
+        Assert.Equal(["setValue"], prompted);
+        Assert.Equal(0, submits[0]);
+    }
+
+    [Fact]
+    public async Task A_form_registered_with_the_default_requires_confirmation_to_submit()
+    {
+        var submits = 0;
+        var form = new FormController(new FormSchema
+        {
+            FormKey = "f", Title = "F",
+            Fields = [new FormFieldSchema { Key = "a", Label = "A" }],
+            OnSubmit = _ =>
+            {
+                submits++;
+                return Task.CompletedTask;
+            },
+        });
+        var agent = new AgentBridgeService();
+        agent.RegisterForm(form);
+
+        var result = await agent.ActAsync([new AgentActStep("F", "submit")]);
+
+        Assert.False(result.Ok);
+        Assert.Equal(0, submits);
+        Assert.True(agent.Snapshot().Single(c => c.Component == "form").ConfirmRequired);
+    }
 }

@@ -395,4 +395,31 @@ public sealed class SpreadsheetAdapterTests
         Assert.Contains("refused by policy", result.Error);
         Assert.True(importer.FileLoaded);
     }
+
+    [Fact]
+    public async Task A_refused_submit_or_clearFile_leaves_the_importer_exactly_as_it_was()
+    {
+        var (agent, importer, _, submitted) = Setup();
+        Assert.True((await Act(agent, "answerValue", "Team", "Kernel", "map", "ops")).Ok);
+        Assert.True((await Act(agent, "editCell", 3, "age", "41")).Ok);
+        Assert.True((await Act(agent, "discardRows", 2)).Ok);
+        Assert.True((await Act(agent, "nextStep")).Ok);
+
+        string Fingerprint() => string.Join("|",
+            importer.CurrentStepKey, importer.FileLoaded, importer.FileName, importer.SubmitStatus, importer.ImportedCount, importer.OpenQuestions.Count,
+            string.Join(",", importer.AllRows.Select(r => $"{r.RowNumber}:{r.Status}:{r.DiscardReason}:{string.Join(";", r.Cells.Select(c => c.Value.Text))}")));
+        var before = Fingerprint();
+        var summaryBefore = Assert.IsType<AgentSpreadsheetSummary>(agent.Snapshot().Single().Value) with { UnmappedRequiredColumns = [] };
+
+        // No policy at all, then a policy that refuses: neither may touch the importer.
+        Assert.False((await Act(agent, "submit")).Ok);
+        Assert.False((await Act(agent, "clearFile")).Ok);
+        agent.AllowPolicy = (_, confirm) => Task.FromResult(!confirm);
+        Assert.False((await Act(agent, "submit")).Ok);
+        Assert.False((await Act(agent, "clearFile")).Ok);
+
+        Assert.Equal(before, Fingerprint());
+        Assert.Equal(summaryBefore, Assert.IsType<AgentSpreadsheetSummary>(agent.Snapshot().Single().Value) with { UnmappedRequiredColumns = [] });
+        Assert.Empty(submitted);
+    }
 }
