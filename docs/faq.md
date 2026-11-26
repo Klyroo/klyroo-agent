@@ -34,7 +34,7 @@ is not an option, a row number the file does not have, or a `setView` key that i
 
 **A step fails with `needs confirmation and no AllowPolicy is set`**
 
-The step targets a form (forms need confirmation by default, `confirmSubmit: false` opts out) or another component registered as confirmation-required, or is a spreadsheet `submit` or `clearFile`, and
+The step is a form `submit` or `reset` (they need confirmation by default, `confirmSubmit: false` opts out) or another component registered as confirmation-required, or is a spreadsheet `submit` or `clearFile`, and
 nothing decides about it. This is the default on purpose. Set `AllowPolicy` (or pass `allow` to `ActAsync`) to approve
 such steps; see [Require approval before consequential actions](guides.md#require-approval-before-consequential-actions).
 
@@ -45,7 +45,7 @@ service is configured; `AddKlyrooAgent()` itself sets no policy.
 
 **Submitting a flagged form is refused**
 
-`confirmSubmit: true` (the default) makes every action on the form need confirmation, and without an `AllowPolicy` or an `allow`
+`confirmSubmit: true` (the default) makes a form `submit` and `reset` need confirmation (moving between steps does not), and without an `AllowPolicy` or an `allow`
 callback those steps are refused. Earlier previews let them through, which is a breaking change; set a policy that
 approves them to get the old behavior. See [Require approval before consequential actions](guides.md#require-approval-before-consequential-actions).
 

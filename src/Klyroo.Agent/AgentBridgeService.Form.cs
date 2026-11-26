@@ -16,10 +16,10 @@ public sealed partial class AgentBridgeService
     /// </summary>
     /// <param name="form">The form to expose.</param>
     /// <param name="confirmSubmit">
-    /// Marks the form component as confirmation-required for every action on the form (<c>submit</c>, <c>reset</c> and
-    /// step navigation): the action is passed to <see cref="AllowPolicy"/> with the flag set, and refused when no policy is set.
-    /// It is <see langword="true"/> by default, so a form is not submitted by an agent until a policy approves it;
-    /// pass <see langword="false"/> to let an agent submit freely.
+    /// Marks <c>submit</c> and <c>reset</c> (which sends the form, or throws away what was typed) as confirmation-required:
+    /// they are passed to <see cref="AllowPolicy"/> with the flag set, and refused when no policy is set. Moving between
+    /// steps never needs confirmation. It is <see langword="true"/> by default, so a form is not submitted by an agent
+    /// until a policy approves it; pass <see langword="false"/> to let an agent submit freely.
     /// </param>
     /// <returns>A handle that removes the form's components when disposed, for example when the form closes.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="form"/> is <see langword="null"/>.</exception>
@@ -104,7 +104,7 @@ public sealed partial class AgentBridgeService
             Ref = NextRef(),
             Component = "form",
             Label = form.Schema.Title ?? form.Schema.FormKey,
-            ConfirmRequired = confirmSubmit,
+            ConfirmActions = confirmSubmit ? ["submit", "reset"] : [],
             GetValue = () => form.IsDirty ? "dirty" : "clean",
             Actions = form.IsStepped ? ["submit", "reset", "nextStep", "previousStep"] : ["submit", "reset"],
             GetChoices = () => [],

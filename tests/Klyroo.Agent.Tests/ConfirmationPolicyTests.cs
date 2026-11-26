@@ -121,13 +121,36 @@ public sealed class ConfirmationPolicyTests
     }
 
     [Fact]
+    public async Task Moving_between_steps_of_a_form_never_needs_confirmation()
+    {
+        var form = new FormController(new FormSchema
+        {
+            FormKey = "wizard",
+            Title = "Wizard",
+            Steps =
+            [
+                new FormStepSchema { Key = "one", Title = "One", Fields = [new FormFieldSchema { Key = "a", Label = "A" }] },
+                new FormStepSchema { Key = "two", Title = "Two", Fields = [new FormFieldSchema { Key = "b", Label = "B" }] },
+            ],
+        });
+        var agent = new AgentBridgeService();
+        agent.RegisterForm(form);
+
+        var result = await agent.ActAsync([new AgentActStep("Wizard", "nextStep")]);
+
+        Assert.True(result.Ok, result.Error);
+    }
+
+    [Fact]
     public void The_snapshot_reports_which_actions_need_confirmation()
     {
         var (agent, _, _) = ConfirmedForm();
         var form = agent.Snapshot().Single(s => s.Component == "form");
         var field = agent.Snapshot().Single(s => s.Component == "number");
 
-        Assert.True(form.ConfirmRequired);
+        // Submit and reset need confirmation; the form component itself does not, so moving between steps never asks.
+        Assert.False(form.ConfirmRequired);
+        Assert.Equal(["submit", "reset"], form.ConfirmActions);
         Assert.False(field.ConfirmRequired);
         Assert.Empty(field.ConfirmActions!);
     }
@@ -191,7 +214,7 @@ public sealed class ConfirmationPolicyTests
 
         Assert.False(result.Ok);
         Assert.Equal(0, submits);
-        Assert.True(agent.Snapshot().Single(c => c.Component == "form").ConfirmRequired);
+        Assert.Contains("submit", agent.Snapshot().Single(c => c.Component == "form").ConfirmActions!);
     }
 
     [Fact]

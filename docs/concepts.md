@@ -62,8 +62,8 @@ correct itself. There is no rollback. If step 3 of 5 fails, steps 1 and 2 stay a
 
 ## Confirmation and policy
 
-The bridge does not decide what is risky in your app. You mark it: `RegisterForm(form, confirmSubmit: true)`, which is the default, sets
-`ConfirmRequired` on the form component (pass `confirmSubmit: false` to let an agent submit freely), and every action on that component carries the flag to the policy. Some
+The bridge does not decide what is risky in your app. You mark it: `RegisterForm(form, confirmSubmit: true)`, which is the default, lists
+`submit` and `reset` in the `ConfirmActions` of the form component (pass `confirmSubmit: false` to let an agent submit freely), and those two actions carry the flag to the policy; moving between steps never does. Some
 actions are marked by the bridge itself: a spreadsheet `submit` and `clearFile` always need confirmation, listed in
 `ConfirmActions` of the snapshot entry. `AllowPolicy` is the single place where you turn the flag into a decision,
 typically by asking the user.

@@ -135,7 +135,7 @@ public sealed class AgentAIFunctionTests
         var labels = snapshot.EnumerateArray().Select(c => c.GetProperty("label").GetString()).ToList();
         Assert.Equal(["Amount", "Reason", "Refund"], labels);
         var form = snapshot.EnumerateArray().Single(c => c.GetProperty("component").GetString() == "form");
-        Assert.True(form.GetProperty("confirmRequired").GetBoolean());
+        Assert.Contains("submit", form.GetProperty("confirmActions").EnumerateArray().Select(a => a.GetString()));
 
         var query = AsJson(await Function(functions, "query").Run(Args("""{ "within": "Reason", "text": "late" }""")));
         var item = query[0].GetProperty("items")[0];
