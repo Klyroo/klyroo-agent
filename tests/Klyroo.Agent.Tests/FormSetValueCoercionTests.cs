@@ -364,4 +364,48 @@ public sealed class FormSetValueCoercionTests
         Assert.Equal("s3cret!", form.GetValue("f"));
         Assert.Equal(AgentBridgeService.RedactedValue, result.Values.Values.Single());
     }
+
+    [Theory]
+    [InlineData(FormFieldKind.Checkbox, false, "bool")]
+    [InlineData(FormFieldKind.Switch, false, "bool")]
+    [InlineData(FormFieldKind.CheckboxGroup, false, "list")]
+    [InlineData(FormFieldKind.Tag, false, "list")]
+    [InlineData(FormFieldKind.Select, true, "list")]
+    [InlineData(FormFieldKind.AutoComplete, true, "list")]
+    [InlineData(FormFieldKind.Select, false, "null")]
+    [InlineData(FormFieldKind.Radio, false, "null")]
+    [InlineData(FormFieldKind.Number, false, "null")]
+    [InlineData(FormFieldKind.Date, false, "null")]
+    [InlineData(FormFieldKind.Text, false, "null")]
+    public async Task Clear_stores_the_empty_value_of_the_field_kind(FormFieldKind kind, bool multiple, string expected)
+    {
+        object? start = kind switch
+        {
+            FormFieldKind.Checkbox or FormFieldKind.Switch => true,
+            _ when expected == "list" => new List<string> { "apple" },
+            FormFieldKind.Number => 5.0,
+            _ => "apple",
+        };
+        var (agent, form) = Setup(new FormFieldSchema { Key = "f", Label = "F", Kind = kind, Multiple = multiple, Options = Fruits, DefaultValue = start });
+
+        var result = await agent.ActAsync([new AgentActStep("F", "clear")]);
+
+        Assert.True(result.Ok, result.Error);
+        var value = form.GetValue("f");
+        switch (expected)
+        {
+            case "bool": Assert.Equal(false, value); break;
+            case "list": Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<string>>(value)); break;
+            default: Assert.Null(value); break;
+        }
+    }
+
+    [Fact]
+    public async Task Clear_is_refused_on_a_repeatable_list()
+    {
+        var (agent, _) = Setup(new FormFieldSchema { Key = "f", Label = "F", Kind = FormFieldKind.ArrayList, Fields = [new FormFieldSchema { Key = "c", Label = "C" }] });
+        var result = await agent.ActAsync([new AgentActStep("F", "clear")]);
+        Assert.False(result.Ok);
+        Assert.Contains("no value to clear", result.Error);
+    }
 }

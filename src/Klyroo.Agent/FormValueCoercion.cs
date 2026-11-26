@@ -21,6 +21,18 @@ internal static class FormValueCoercion
 
     private static readonly string[] TimeFormats = ["HH:mm", "HH:mm:ss"];
 
+    /// <summary>
+    /// The value <c>clear</c> stores, with the type the field kind holds: <see langword="false"/> for a checkbox or
+    /// switch, an empty list for a tag or multiple choice field, otherwise <see langword="null"/>.
+    /// </summary>
+    public static object? EmptyValue(FormFieldSchema field) => field.Kind switch
+    {
+        FormFieldKind.Checkbox or FormFieldKind.Switch => false,
+        FormFieldKind.Tag or FormFieldKind.CheckboxGroup => new List<string>(),
+        FormFieldKind.Select or FormFieldKind.AutoComplete when field.Multiple => new List<string>(),
+        _ => null,
+    };
+
     /// <summary>Coerces <paramref name="raw"/> for <paramref name="field"/>. On failure, <paramref name="error"/> says what was expected.</summary>
     public static bool TryCoerce(
         FormFieldSchema field,

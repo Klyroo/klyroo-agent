@@ -43,7 +43,7 @@ public sealed partial class AgentBridgeService
             var actions = componentKind switch
             {
                 "select" => new[] { "setValue", "clear", "reset" },
-                "checkbox" => new[] { "toggle", "setValue", "reset" },
+                "checkbox" => new[] { "toggle", "setValue", "clear", "reset" },
                 _ => new[] { "setValue", "clear", "reset" },
             };
 
@@ -78,7 +78,11 @@ public sealed partial class AgentBridgeService
                             form.SetValue(field.Key, coerced, markTouched: true);
                             return Task.FromResult<StepResult>(true);
                         case "clear":
-                            form.SetValue(field.Key, field.Kind == FormFieldKind.Checkbox ? false : null, markTouched: true);
+                            if (FormController.IsContainer(field.Kind) || field.Kind is FormFieldKind.ArrayList or FormFieldKind.ArrayTable)
+                            {
+                                return Task.FromResult(StepResult.Fail($"\"{field.Key}\" has no value to clear."));
+                            }
+                            form.SetValue(field.Key, FormValueCoercion.EmptyValue(field), markTouched: true);
                             return Task.FromResult<StepResult>(true);
                         case "toggle":
                             var cur = form.GetValue<bool>(field.Key);
