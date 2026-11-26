@@ -58,7 +58,8 @@ public sealed class AgentBridgeService
 
     /// <summary>
     /// Subscribes to the changes made through <see cref="ActAsync"/>. The callback runs synchronously after each
-    /// successful step. Changes a user makes directly in the UI are not reported.
+    /// successful step. Changes a user makes directly in the UI are not reported. An exception thrown by the callback
+    /// is ignored: the step is already applied, so the run goes on and the other subscribers are still called.
     /// </summary>
     /// <param name="callback">Called with one <see cref="ObservedChange"/> per successful step.</param>
     /// <returns>A handle that removes the subscription when disposed.</returns>
@@ -464,7 +465,14 @@ public sealed class AgentBridgeService
     {
         foreach (var obs in _observers.ToList())
         {
-            obs(change);
+            try
+            {
+                obs(change);
+            }
+            catch (Exception)
+            {
+                // The step is already applied: a failing subscriber must not abort the run or starve the others.
+            }
         }
     }
 

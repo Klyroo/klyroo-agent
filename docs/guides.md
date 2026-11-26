@@ -212,7 +212,8 @@ using var subscription = agent.Observe(change =>
 
 Password and one-time-code values reach the callback as `[redacted]`. Only changes made through `ActAsync` are
 reported, so edits a user types into the page do not appear. The callback runs synchronously inside `ActAsync`, so
-keep it fast and do not throw: an exception propagates out of `ActAsync` and ends the run.
+keep it fast. An exception it throws is ignored, so it cannot end the run or keep other subscribers from being
+called; catch and log inside the callback if you need to know about it.
 
 ## Use the browser runtime and WebMCP
 
