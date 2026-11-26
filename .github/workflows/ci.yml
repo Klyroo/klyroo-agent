@@ -78,6 +78,11 @@ jobs:
         run: dotnet build Klyroo.Agent.slnx -c Release --no-restore --nologo
       - name: Test
         run: dotnet test Klyroo.Agent.slnx -c Release --no-build --nologo
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Browser runtime tests
+        run: node --test packages/agent/test/act.test.mjs
       - name: NativeAOT and trimming analyzers on the .Core libraries
         run: |
           # Only the libraries that declare NativeAOT compatibility: the global properties would otherwise also flow into

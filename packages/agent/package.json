@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "main": "./index.js",
+  "scripts": {
+    "test": "node --test test/act.test.mjs"
+  },
   "description": "Klyroo Semantic UI Agent runtime (snapshot, query, act, observe, WebMCP)."
 }

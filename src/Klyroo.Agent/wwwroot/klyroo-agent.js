@@ -132,12 +132,38 @@ function discoverComponents(root = document) {
   return list;
 }
 
+/** True when the element rejects interaction: disabled itself, inside a disabled fieldset, or marked aria-disabled. */
+function isDisabledElement(el) {
+  if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') return true;
+  try {
+    return typeof el.matches === 'function' && el.matches(':disabled');
+  } catch {
+    return false;
+  }
+}
+
+/** True when the element is not displayed: detached, hidden, inside a closed dialog, or not rendered by CSS. */
+function isOffPageElement(el) {
+  if (!el.isConnected || el.closest('[hidden], dialog:not([open])') !== null) return true;
+  return typeof el.checkVisibility === 'function' && !el.checkVisibility();
+}
+
+/** True when the element, or an ancestor, asks for confirmation before an agent acts on it. */
+function needsConfirmation(el) {
+  return el.hasAttribute('data-agent-confirm') || el.closest('[data-agent-confirm]') !== null;
+}
+
 function describeElement(el) {
   const ref = assignRef(el);
   const sensitive = isSensitiveElement(el);
   const label = labelOf(el);
-  const disabled = el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true';
-  const offPage = !el.isConnected || el.closest('[hidden], dialog:not([open])') !== null;
+  const disabled = isDisabledElement(el);
+  const offPage = isOffPageElement(el);
+  const confirmRequired = needsConfirmation(el);
+  return { ...describeKind(el, { ref, sensitive, label, disabled, offPage }), confirmRequired };
+}
+
+function describeKind(el, { ref, sensitive, label, disabled, offPage }) {
 
   if (el.__klyPrimitive) {
     const prim = el.__klyPrimitive;
@@ -290,89 +316,112 @@ export function createAgent({ allow = null } = {}) {
   async function act({ steps = [], allow: callAllow = null } = {}) {
     const appliedSteps = [];
     const values = {};
+    const fail = (error) => ({ ok: false, steps: appliedSteps, values, error });
+
+    if (!Array.isArray(steps)) return fail('"steps" must be a list of steps.');
 
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-      const elements = discoverComponents(document);
-      const normRef = normalizeLabel(step.ref);
-      const matches = elements.filter((el) => {
-        const r = assignRef(el);
-        if (r === step.ref) return true;
-        return normalizeLabel(labelOf(el) || el.textContent) === normRef;
-      });
-
-      if (matches.length === 0) {
-        return { ok: false, steps: appliedSteps, values, error: `Step ${i + 1}: component "${step.ref}" not found.` };
-      }
-      if (matches.length > 1 && !refToElement.has(step.ref)) {
-        return {
-          ok: false,
-          steps: appliedSteps,
-          values,
-          error: `Step ${i + 1}: ambiguous label "${step.ref}" matched ${matches.length} components (${matches.map(assignRef).join(', ')}). Use a specific ref.`,
-        };
-      }
-
-      const el = matches[0];
-      const ref = assignRef(el);
-      const needsConfirm = el.hasAttribute('data-agent-confirm') || el.closest('[data-agent-confirm]') !== null;
-      const stepWithMeta = { ...step, ref, confirm: needsConfirm };
-
-      if (allow && (await allow(stepWithMeta)) === false) {
-        return { ok: false, steps: appliedSteps, values, error: `Step ${i + 1}: action "${step.action}" refused by agent policy.` };
-      }
-      if (callAllow && (await callAllow(stepWithMeta)) === false) {
-        return { ok: false, steps: appliedSteps, values, error: `Step ${i + 1}: action "${step.action}" refused by caller policy.` };
-      }
-
-      const prevValue = el.value ?? el.getAttribute('value') ?? null;
-      const args = step.args ?? [];
-
-      if (el.__klyPrimitive && typeof el.__klyPrimitive.api[step.action] === 'function') {
-        el.__klyPrimitive.api[step.action](...args);
-      } else if (step.action === 'setValue') {
-        const nextVal = args[0] ?? '';
-        if ('value' in el) el.value = nextVal;
-        el.setAttribute('value', String(nextVal));
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        el.dispatchEvent(new CustomEvent('kly-change', { bubbles: true, detail: { value: nextVal, source: 'agent' } }));
-      } else if (step.action === 'clear') {
-        if ('value' in el) el.value = '';
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      } else if (step.action === 'toggle' || step.action === 'setChecked') {
-        if ('checked' in el) {
-          el.checked = step.action === 'setChecked' ? Boolean(args[0]) : !el.checked;
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-        } else {
-          el.click();
+      try {
+        if (!step || typeof step.ref !== 'string' || typeof step.action !== 'string') {
+          return fail(`Step ${i + 1}: a step needs a "ref" and an "action" as text.`);
         }
-      } else if (step.action === 'press') {
-        el.click();
-      } else if (step.action === 'focus') {
-        el.focus();
-      } else {
-        return { ok: false, steps: appliedSteps, values, error: `Step ${i + 1}: unsupported action "${step.action}" on ${ref}.` };
+        if (step.args !== undefined && step.args !== null && !Array.isArray(step.args)) {
+          return fail(`Step ${i + 1}: "args" must be a list.`);
+        }
+        const elements = discoverComponents(document);
+        const normRef = normalizeLabel(step.ref);
+        const matches = elements.filter((el) => {
+          const r = assignRef(el);
+          if (r === step.ref) return true;
+          return normalizeLabel(labelOf(el) || el.textContent) === normRef;
+        });
+
+        if (matches.length === 0) {
+          return fail(`Step ${i + 1}: component "${step.ref}" not found.`);
+        }
+        if (matches.length > 1 && !refToElement.has(step.ref)) {
+          return fail(`Step ${i + 1}: ambiguous label "${step.ref}" matched ${matches.length} components (${matches.map(assignRef).join(', ')}). Use a specific ref.`);
+        }
+
+        const el = matches[0];
+        const ref = assignRef(el);
+        const name = labelOf(el) || el.textContent?.trim() || ref;
+
+        if (isDisabledElement(el)) {
+          return fail(`Step ${i + 1}: component "${name}" (${ref}) is disabled.`);
+        }
+        if (isOffPageElement(el)) {
+          return fail(`Step ${i + 1}: component "${name}" (${ref}) is not displayed right now.`);
+        }
+
+        const needsConfirm = needsConfirmation(el);
+        // A confirmation-required component is refused unless a policy decides about it.
+        if (needsConfirm && !allow && !callAllow) {
+          return fail(`Step ${i + 1}: action "${step.action}" on "${name}" (${ref}) needs confirmation and no allow policy is set.`);
+        }
+        const stepWithMeta = { ...step, ref, confirm: needsConfirm };
+
+        if (allow && (await allow(stepWithMeta)) === false) {
+          return fail(`Step ${i + 1}: action "${step.action}" refused by agent policy.`);
+        }
+        if (callAllow && (await callAllow(stepWithMeta)) === false) {
+          return fail(`Step ${i + 1}: action "${step.action}" refused by caller policy.`);
+        }
+
+        const prevValue = el.value ?? el.getAttribute('value') ?? null;
+        const args = step.args ?? [];
+
+        if (el.__klyPrimitive && typeof el.__klyPrimitive.api[step.action] === 'function') {
+          await el.__klyPrimitive.api[step.action](...args);
+        } else if (step.action === 'setValue') {
+          const nextVal = args[0] ?? '';
+          if ('value' in el) el.value = nextVal;
+          el.setAttribute('value', String(nextVal));
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          el.dispatchEvent(new CustomEvent('kly-change', { bubbles: true, detail: { value: nextVal, source: 'agent' } }));
+        } else if (step.action === 'clear') {
+          if ('value' in el) el.value = '';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        } else if (step.action === 'toggle' || step.action === 'setChecked') {
+          if ('checked' in el) {
+            el.checked = step.action === 'setChecked' ? Boolean(args[0]) : !el.checked;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          } else {
+            el.click();
+          }
+        } else if (step.action === 'press') {
+          el.click();
+        } else if (step.action === 'focus') {
+          el.focus();
+        } else {
+          return fail(`Step ${i + 1}: unsupported action "${step.action}" on ${ref}.`);
+        }
+
+        const newValue = el.value ?? el.getAttribute('value') ?? null;
+        const sensitive = isSensitiveElement(el);
+        emitObservedChange({
+          component: describeElement(el).component,
+          ref,
+          label: labelOf(el),
+          key: 'value',
+          previous: prevValue,
+          value: newValue,
+          reason: step.action,
+          source: 'agent',
+          sensitive,
+          element: el,
+        });
+
+        values[ref] = sensitive ? '[redacted]' : newValue;
+        appliedSteps.push({ ref, action: step.action, ok: true });
+      } catch (err) {
+        // Failures are values: a policy, a primitive or an event handler that throws fails the run instead of rejecting act().
+        const message = err instanceof Error ? err.message : String(err);
+        return fail(`Step ${i + 1}: action "${step?.action}" on "${step?.ref}" failed: ${message}`);
       }
-
-      const newValue = el.value ?? el.getAttribute('value') ?? null;
-      const sensitive = isSensitiveElement(el);
-      emitObservedChange({
-        component: describeElement(el).component,
-        ref,
-        label: labelOf(el),
-        key: 'value',
-        previous: prevValue,
-        value: newValue,
-        reason: step.action,
-        source: 'agent',
-        sensitive,
-        element: el,
-      });
-
-      values[ref] = sensitive ? '[redacted]' : newValue;
-      appliedSteps.push({ ref, action: step.action, ok: true });
     }
 
     return { ok: true, steps: appliedSteps, values };
@@ -448,10 +497,14 @@ export function registerWebMcp(agent, { allow = null } = {}) {
     const unregister = mc.registerTool({
       ...tool,
       execute: async (args) => {
-        if (tool.name === 'snapshot') return agent.snapshot(args);
-        if (tool.name === 'query') return agent.query(args);
-        if (tool.name === 'act') return agent.act({ ...args, allow });
-        return null;
+        try {
+          if (tool.name === 'snapshot') return agent.snapshot(args);
+          if (tool.name === 'query') return agent.query(args);
+          if (tool.name === 'act') return await agent.act({ ...args, allow });
+          return null;
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        }
       },
     });
     if (typeof unregister === 'function') cleanups.push(unregister);

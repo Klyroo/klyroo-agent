@@ -76,10 +76,16 @@ public sealed partial class AgentBridgeService
     private int _refCounter;
 
     /// <summary>
-    /// An optional gate called before every <see cref="ActAsync"/> step with the step and whether the target was
-    /// registered as confirmation-required. Return <see langword="false"/> to refuse the step. When this is
-    /// <see langword="null"/>, steps are never refused, including steps on confirmation-required targets.
+    /// The gate called before every <see cref="ActAsync"/> step with the step and whether it needs confirmation, because
+    /// its component was registered as confirmation-required or the action is one that always is (<c>submit</c> and
+    /// <c>clearFile</c> on a spreadsheet). Return <see langword="false"/> to refuse the step.
     /// </summary>
+    /// <remarks>
+    /// When this is <see langword="null"/> and <see cref="ActAsync"/> gets no <c>allow</c> argument either, steps that
+    /// need confirmation are refused, and every other step runs. Set a policy to allow them, for example
+    /// <c>agent.AllowPolicy = async (step, confirm) =&gt; !confirm || await AskUserAsync(step);</c>, or
+    /// <c>(_, _) =&gt; Task.FromResult(true)</c> to approve everything, which is only reasonable when a person drives the agent.
+    /// </remarks>
     public Func<AgentActStep, bool, Task<bool>>? AllowPolicy { get; set; }
 
     /// <summary>Returns the definitions of the three agent tools, <c>snapshot</c>, <c>query</c> and <c>act</c>, for registration with an LLM or MCP host.</summary>
@@ -338,7 +344,7 @@ public sealed partial class AgentBridgeService
     /// rather than thrown.
     /// </summary>
     /// <param name="steps">The steps to run.</param>
-    /// <param name="allow">An extra gate for this call only, called after <see cref="AllowPolicy"/> with the same arguments.</param>
+    /// <param name="allow">An extra gate for this call only, called after <see cref="AllowPolicy"/> with the same arguments. It also counts as a policy for steps that need confirmation.</param>
     /// <returns>The outcome of the run.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="steps"/> is <see langword="null"/>.</exception>
     public async Task<AgentActResult> ActAsync(
@@ -381,11 +387,16 @@ public sealed partial class AgentBridgeService
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" is not supported by \"{target.Label}\" ({target.Ref}).");
             }
 
-            if (AllowPolicy is not null && !await AllowPolicy(step, target.NeedsConfirmation(step.Action)))
+            var needsConfirmation = target.NeedsConfirmation(step.Action);
+            if (needsConfirmation && AllowPolicy is null && allow is null)
+            {
+                return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" needs confirmation and no AllowPolicy is set.");
+            }
+            if (AllowPolicy is not null && !await AllowPolicy(step, needsConfirmation))
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was refused by policy.");
             }
-            if (allow is not null && !await allow(step, target.NeedsConfirmation(step.Action)))
+            if (allow is not null && !await allow(step, needsConfirmation))
             {
                 return new AgentActResult(false, outcomes, values, $"Step {i + 1}: action \"{step.Action}\" on \"{target.Label}\" was refused by caller policy.");
             }

@@ -120,7 +120,8 @@ public sealed class AgentBridgeDeepTests
         });
         importer.LoadText("Name\nAlice\nBob", "contacts.csv");
 
-        var agent = new AgentBridgeService();
+        // submit is confirmation-required, which is refused unless a policy approves it.
+        var agent = new AgentBridgeService { AllowPolicy = (_, _) => Task.FromResult(true) };
         agent.RegisterSpreadsheet(importer);
 
         var snap = agent.Snapshot();

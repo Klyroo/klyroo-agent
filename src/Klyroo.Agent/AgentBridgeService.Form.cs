@@ -12,8 +12,8 @@ public sealed partial class AgentBridgeService
     /// </summary>
     /// <param name="form">The form to expose.</param>
     /// <param name="confirmSubmit">
-    /// Marks the form component as confirmation-required, which is passed to <see cref="AllowPolicy"/> for every
-    /// action on the form (<c>submit</c>, <c>reset</c> and step navigation).
+    /// Marks the form component as confirmation-required for every action on the form (<c>submit</c>, <c>reset</c> and
+    /// step navigation): the action is passed to <see cref="AllowPolicy"/> with the flag set, and refused when no policy is set.
     /// </param>
     /// <returns>A handle that removes the form's components when disposed, for example when the form closes.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="form"/> is <see langword="null"/>.</exception>
