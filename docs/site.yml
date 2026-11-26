@@ -17,8 +17,54 @@ packages:
   - Klyroo.Agent
   - Klyroo.Agent.AI
 
-# The primary color of the site, the name of a Tailwind palette (blue, emerald, violet...). Without it the Klyroo colors are used.
-# accent: blue
+# The home page. headline is two lines, the second in the accent color; lead is the paragraph under it. Without them: the title and the tagline.
+headline: |
+  Let agents operate your
+  forms, not your markup.
+lead: >-
+  An agent that drives a UI through CSS selectors breaks when the markup changes. Klyroo.Agent works with the labels, values and named actions of the controllers behind your UI.
+
+# The accent of the site (#rrggbb): buttons, links, marks and the second line of the headline. The text variants that pass the contrast rules in light and
+# dark mode are computed from it. Without it: the color of the library in klyroo-stack/docs-site/Klyroo.Docs.Site/libraries.yml.
+accent: "#6366f1"
+
+# The texture of the ground behind the header and the hero: blueprint-grid, dot-matrix, ruled-rows, baseline-grid, chart-ticks, halftone, cell-grid or node-dots.
+texture: node-dots
+
+# What the hero demonstrates. Either board: table | form (a board with feature chips and several results, authored in docs-site), or a simple hero: the code,
+# the lines the leader line starts at (focus) and one result (output: lines of text, or preview: ui-settings | display-stat | spreadsheet-rows).
+demo:
+  file: Program.cs
+  language: csharp
+  focus: 18-21
+  code: |
+    var agent = new AgentBridgeService();
+
+    var schema = FormSchema.For<Project>(s =>
+    {
+        s.FormKey = "project-settings";
+        s.Title = "Project settings";
+        s.Field(p => p.Name, f => f.Label("Project name"));
+        s.Field(p => p.Region, f => f.Options(
+        [
+            new FormOption<string>("us-east", "US East"),
+            new FormOption<string>("eu-west", "Europe West"),
+        ]));
+    });
+    var form = new FormController<Project>(schema, new Project());
+
+    agent.RegisterForm(form);
+
+    foreach (var component in agent.Snapshot())
+    {
+        Console.WriteLine($"{component.Ref} {component.Component} \"{component.Label}\" = {component.Value?.ToDisplayString()}");
+    }
+  result:
+    title: What the agent sees
+    output: |
+      c1 input "Project name" = Apollo
+      c2 select "Region" = us-east
+      c3 form "Project settings" = clean
 
 # The pages in the order of the navigation. docs/README.md comes first, as "Documentation". A page that is not listed follows, by file name.
 # An entry is a file name below docs/ without .md, or a map with page and any of: title, navTitle, description, tocDepth, indexText. A group has a group name and its pages.
