@@ -1,4 +1,4 @@
-# Klyroo.Agent API reference API reference
+# Klyroo.Agent API reference
 
 > Generated from the compiled assemblies and their XML documentation. Do not edit by hand.
 
