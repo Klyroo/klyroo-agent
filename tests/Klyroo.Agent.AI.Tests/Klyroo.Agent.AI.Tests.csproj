@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <ProjectReference Include="..\..\src\Klyroo.Agent.AI\Klyroo.Agent.AI.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Klyroo.Form" />
+    <Using Include="Klyroo.Dashboard" />
+    <Using Include="Klyroo.Spreadsheet" />
+  </ItemGroup>
+</Project>

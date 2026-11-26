@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Klyroo.Agent.AI</RootNamespace>
+    <PackageId>Klyroo.Agent.AI</PackageId>
+    <PackageTags>klyroo;blazor;ai;agents;tools;microsoft-extensions-ai;aifunction;function-calling</PackageTags>
+    <Description>Klyroo Agent for Microsoft.Extensions.AI: exposes the snapshot, query and act tools of Klyroo.Agent as AIFunction instances for any IChatClient, with an approval step for actions that need confirmation.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
+    <ProjectReference Include="..\Klyroo.Agent\Klyroo.Agent.csproj" />
+  </ItemGroup>
+</Project>

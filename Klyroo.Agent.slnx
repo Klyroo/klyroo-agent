@@ -2,9 +2,11 @@
   <Folder Name="/src/">
     <Project Path="src/Klyroo.Agent.Core/Klyroo.Agent.Core.csproj" />
     <Project Path="src/Klyroo.Agent/Klyroo.Agent.csproj" />
+    <Project Path="src/Klyroo.Agent.AI/Klyroo.Agent.AI.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Klyroo.Agent.Tests/Klyroo.Agent.Tests.csproj" />
+    <Project Path="tests/Klyroo.Agent.AI.Tests/Klyroo.Agent.AI.Tests.csproj" />
   </Folder>
   <Folder Name="/examples/">
     <Project Path="examples/HeadlessAgentExample/HeadlessAgentExample.csproj" />

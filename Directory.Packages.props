@@ -7,6 +7,9 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageVersion Include="TailwindMerge.NET" Version="1.5.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.15" />
+    <!-- Klyroo.Agent.AI exposes the bridge as AIFunction instances; the tests run FunctionInvokingChatClient from Microsoft.Extensions.AI. Both versions exist on nuget.org. -->
+    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.11.0" />
     <PackageVersion Include="ModelContextProtocol" Version="2.4.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.4.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="11.0.100" />
