@@ -19,8 +19,8 @@ packages:
 
 # The home page. headline is two lines, the second in the accent color; lead is the paragraph under it. Without them: the title and the tagline.
 headline: |
-  Let agents operate your
-  forms, not your markup.
+  Let agents operate
+  forms, not markup.
 lead: >-
   An agent that drives a UI through CSS selectors breaks when the markup changes. Klyroo.Agent works with the labels, values and named actions of the controllers behind your UI.
 
@@ -36,7 +36,7 @@ texture: node-dots
 demo:
   file: Program.cs
   language: csharp
-  focus: 18-21
+  focus: 18-23
   code: |
     var agent = new AgentBridgeService();
 
@@ -55,9 +55,11 @@ demo:
 
     agent.RegisterForm(form);
 
-    foreach (var component in agent.Snapshot())
+    foreach (var c in agent.Snapshot())
     {
-        Console.WriteLine($"{component.Ref} {component.Component} \"{component.Label}\" = {component.Value?.ToDisplayString()}");
+        Console.WriteLine(
+            $"{c.Ref} {c.Component} \"{c.Label}\" = " +
+            $"{c.Value?.ToDisplayString()}");
     }
   result:
     title: What the agent sees
