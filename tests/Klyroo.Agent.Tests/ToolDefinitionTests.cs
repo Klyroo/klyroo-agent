@@ -205,4 +205,55 @@ public sealed class ToolDefinitionTests
         Assert.Equal([3, 4], Assert.Single(result).Records!.Select(r => (int)r["rowNumber"]!));
         Assert.IsType<AgentToolError>(await agent.InvokeToolAsync("query", Json("""{ "limit": 2.5 }""")));
     }
+
+    [Fact]
+    public void The_act_schema_agrees_with_the_parser_on_args_and_the_step_cap()
+    {
+        var steps = AgentBridgeService.GetToolDefinitions().Single(t => t.Name == "act").InputSchema.GetProperty("properties").GetProperty("steps");
+        Assert.Equal(AgentBridgeService.MaxStepsPerAct, steps.GetProperty("maxItems").GetInt32());
+
+        var item = steps.GetProperty("items").GetProperty("properties");
+        Assert.Equal(1, item.GetProperty("ref").GetProperty("minLength").GetInt32());
+        Assert.Equal(1, item.GetProperty("action").GetProperty("minLength").GetInt32());
+
+        var argTypes = item.GetProperty("args").GetProperty("items").GetProperty("type").EnumerateArray().Select(e => e.GetString()).ToList();
+        Assert.DoesNotContain("object", argTypes);
+        Assert.Equivalent(new[] { "string", "number", "boolean", "null", "array" }, argTypes);
+        var nested = item.GetProperty("args").GetProperty("items").GetProperty("items").GetProperty("type").EnumerateArray().Select(e => e.GetString());
+        Assert.DoesNotContain("object", nested);
+    }
+
+    [Theory]
+    [InlineData("""{ "steps": [ { "ref": "Quantity", "action": "setValue", "args": [ { "a": 1 } ] } ] }""")]
+    [InlineData("""{ "steps": [ { "ref": "Quantity", "action": "setValue", "args": [ [ { "a": 1 } ] ] } ] }""")]
+    [InlineData("""{ "steps": [ { "ref": "", "action": "setValue" } ] }""")]
+    [InlineData("""{ "steps": [ { "ref": "Quantity", "action": "" } ] }""")]
+    public async Task The_parser_refuses_what_the_schema_does_not_allow(string arguments)
+    {
+        var (agent, form) = Bridge();
+
+        var result = await agent.InvokeToolAsync("act", Json(arguments));
+
+        Assert.IsType<AgentToolError>(result);
+        Assert.Null(form.GetValue("qty"));
+    }
+
+    [Fact]
+    public async Task Every_value_kind_the_schema_allows_is_accepted_by_the_parser()
+    {
+        var (agent, _) = Bridge();
+
+        var result = await agent.InvokeToolAsync("act", Json("""
+            { "steps": [
+                { "ref": "Quantity", "action": "setValue", "args": ["3"] },
+                { "ref": "Quantity", "action": "setValue", "args": [3] },
+                { "ref": "Quantity", "action": "setValue", "args": [3.5] },
+                { "ref": "Quantity", "action": "clear", "args": [null] },
+                { "ref": "Toppings", "action": "setValue", "args": [["cheese"]] },
+                { "ref": "Toppings", "action": "clear", "args": [true] }
+            ] }
+            """));
+
+        Assert.True(Assert.IsType<AgentActResult>(result).Ok, ((AgentActResult)result).Error);
+    }
 }

@@ -35,13 +35,21 @@ public sealed partial class AgentBridgeService
           "properties": {
             "steps": {
               "type": "array",
+              "maxItems": 50,
               "items": {
                 "type": "object",
                 "required": ["ref", "action"],
                 "properties": {
-                  "ref": { "type": "string", "description": "Component ref (for example c1) or label." },
-                  "action": { "type": "string", "description": "Action name from the snapshot (for example setValue, clear, toggle, submit)." },
-                  "args": { "type": "array", "items": {}, "description": "Arguments for the action, such as the new value of setValue. Pass numbers, booleans and lists as JSON values, not as text." }
+                  "ref": { "type": "string", "minLength": 1, "description": "Component ref (for example c1) or label." },
+                  "action": { "type": "string", "minLength": 1, "description": "Action name from the snapshot (for example setValue, clear, toggle, submit)." },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "type": ["string", "number", "boolean", "null", "array"],
+                      "items": { "type": ["string", "number", "boolean", "null"] }
+                    },
+                    "description": "Arguments for the action, such as the new value of setValue. Pass numbers, booleans and lists as JSON values, not as text. An argument is text, a number, a boolean, null or a list of those; objects are not accepted."
+                  }
                 }
               }
             }
@@ -173,6 +181,13 @@ public sealed partial class AgentBridgeService
         return true;
     }
 
+    private static bool ContainsObject(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Object => true,
+        JsonValueKind.Array => element.EnumerateArray().Any(ContainsObject),
+        _ => false,
+    };
+
     private static bool TryParseSteps(JsonElement obj, out List<AgentActStep> steps, out string? error)
     {
         steps = [];
@@ -199,6 +214,11 @@ public sealed partial class AgentBridgeService
                 if (argList.ValueKind != JsonValueKind.Array)
                 {
                     error = $"Step {index}: \"args\" must be a list.";
+                    return false;
+                }
+                if (argList.EnumerateArray().Any(ContainsObject))
+                {
+                    error = $"Step {index}: an argument is an object; arguments are text, numbers, booleans, null or lists of those.";
                     return false;
                 }
                 // The raw elements are kept: ActAsync unwraps them, so a number stays a number and a list stays a list.
