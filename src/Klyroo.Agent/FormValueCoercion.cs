@@ -76,7 +76,14 @@ internal static class FormValueCoercion
             case FormFieldKind.Select or FormFieldKind.AutoComplete when field.Multiple:
                 return TryChoices(field, options, arg, multiple: true, out value, out error);
 
-            case FormFieldKind.Select or FormFieldKind.AutoComplete or FormFieldKind.Radio:
+            case FormFieldKind.AutoComplete:
+                // Like the built-in input: text that names an option stores its value, any other text is kept as typed.
+                if (TryChoices(field, options, arg, multiple: false, out value, out error)) return true;
+                if (arg is not string) return false;
+                error = null;
+                return TryText(field, arg, out value, out error);
+
+            case FormFieldKind.Select or FormFieldKind.Radio:
                 return TryChoices(field, options, arg, multiple: false, out value, out error);
 
             case FormFieldKind.Tag:

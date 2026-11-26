@@ -200,7 +200,6 @@ public sealed class FormSetValueCoercionTests
     [Theory]
     [InlineData(FormFieldKind.Select)]
     [InlineData(FormFieldKind.Radio)]
-    [InlineData(FormFieldKind.AutoComplete)]
     public async Task Single_choice_kinds_match_an_option_by_value_or_normalized_label(FormFieldKind kind)
     {
         var (agent, form) = Setup(new FormFieldSchema { Key = "f", Label = "F", Kind = kind, Options = Fruits });
@@ -226,6 +225,20 @@ public sealed class FormSetValueCoercionTests
         Assert.False(many.Ok);
 
         Assert.Equal("pear", form.GetValue("f"));
+    }
+
+    [Fact]
+    public async Task AutoComplete_matches_an_option_and_keeps_other_text_as_typed_like_its_input()
+    {
+        var (agent, form) = Setup(new FormFieldSchema { Key = "f", Label = "F", Kind = FormFieldKind.AutoComplete, Options = Fruits, MaxLength = 10 });
+
+        Assert.True((await Set(agent, Json("\"poire\""))).Ok);
+        Assert.Equal("pear", form.GetValue("f"));
+        Assert.True((await Set(agent, Json("\"banana\""))).Ok);
+        Assert.Equal("banana", form.GetValue("f"));
+        Assert.False((await Set(agent, Json("\"a very long fruit name\""))).Ok);
+        Assert.False((await Set(agent, Json("[\"apple\",\"pear\"]"))).Ok);
+        Assert.Equal("banana", form.GetValue("f"));
     }
 
     [Fact]
